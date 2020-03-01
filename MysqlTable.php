@@ -143,7 +143,7 @@ abstract class SQL_ERR extends ERR {
 
 // ENUMS
 // Mysql data types
-class TYPE extends ExtdEnum
+abstract class TYPE extends ExtdEnum
 {
 	const __default = self::NONE;
 	const NONE =	-1;
@@ -165,7 +165,7 @@ class TYPE extends ExtdEnum
 	const FILE =	30;
 }
 // Rights on tables
-class AUTHORISED extends ExtdEnum
+absttract class AUTHORISED extends ExtdEnum
 {
 	const __default = self::ALL;
 	const ALL =		-1;	// no restriction
@@ -187,13 +187,13 @@ class AUTHORISED extends ExtdEnum
 					];
 }
 // Read/Write access
-class ACCESS extends ExtdEnum {
+abstract class ACCESS extends ExtdEnum {
 	const __default = self::READ;
 	const READ =	0;
 	const WRITE =	1;
 }
 // Get values
-class GET extends ExtdEnum {
+abstract class GET extends ExtdEnum {
 	// default is ID of wanted data
 	// * value will get all in Sql requests when applied to fields
 	const __default = self::ALL;

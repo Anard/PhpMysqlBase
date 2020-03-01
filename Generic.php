@@ -1,6 +1,6 @@
 <?php
 if (!class_exists('SplEnum')) {
-	class SplEnum
+	abstract class SplEnum
 	{
 		const __default = NULL;
 		
@@ -29,7 +29,7 @@ if (!class_exists('SplEnum')) {
 }
 
 
-class ExtdEnum extends SplEnum
+abstract class ExtdEnum extends SplEnum
 {
 	// return true if key have been found
     static function hasKey($key) {

@@ -1,7 +1,7 @@
 <?php
 require_once ('MysqlTable.php');
 
-class "CLASS"__ACTION extends ExtdEnum
+abstract class "CLASS"__ACTION extends ExtdEnum
 {
 	const __default = self::ADD;
 	const ADD =		'add"class"';
