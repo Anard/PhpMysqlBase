@@ -461,7 +461,7 @@ final class SessionManagement implements Session
 		$now = time();
 		if ($dossier = opendir (PATH_UPLOAD['tmp'])) {
 			while (false !== ($file = readdir($dossier))) {
-			    if ($file != '.' && $file != '..') {
+			    if ($file != '.' && $file != '..' && $file != 'index.php') {
 			    	$date = filemtime (PATH_UPLOAD['tmp'].$file);
 			    	if ($date < $now - self::DELAY_OLDFILE) {
 			    		if (file_exists(PATH_UPLOAD['tmp'].$file)) unlink (PATH_UPLOAD['tmp'].$file);
