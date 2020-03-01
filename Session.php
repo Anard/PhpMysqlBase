@@ -1,5 +1,48 @@
 <?php
 require_once ('ErrorHandling.php');
+
+// ERRORS
+abstract class SESS_ERR extends ERR {
+	// session
+	const LOGIN =	10;
+	const PASS =	11;
+	const BANNED =	12;
+	
+	// Print errors
+	public static function print_errors ($Errors, $data = []) {
+		foreach ($Errors as $errors) {
+			foreach ($errors as $error) {
+				switch ($error) {
+					case self::LOGIN:
+						echo '<h3 class="alert">Membre inconnu</h3>';
+						break;
+					case self::PASS:
+						echo '<h3 class="alert">Mot de passe erroné</h3>';
+						break;
+					case self::BANNED:
+						echo '<h3 class="alert">Votre adresse IP est bannie</h3>';
+						echo '<p class="alert">En raison d\'une activité suspecte, votre adresse a été bannie du serveur pour 24 heures. Revenez plus tard ou contactez l\'administrateur pour plus d\'informations.</p>';
+						return true;
+					case self::COOKIE:
+						echo '<h3 class="alert">Merci d\'autoriser les "cookies" pour ce site</h3>';
+						echo '<p class="alert">Les cookies enregistrent une partie de vos préférences de navigation sur votre ordinateur. Ils sont nécessaires au fonctionnement de cette application et n\'enregistrent aucune donnée personnelle. Ils seront immédiatement supprimés lors de votre déconnexion</p>';
+						break;
+						
+					default:
+						$Error = 	[	'name' => 'Utilisateur',
+										'type' => $error
+									];
+	   					if (parent::print_errors ($Error, $data) !== false) return true;
+	   					else break;
+				}
+			}
+		}
+		
+		return false;
+	}
+}
+
+// ECHECS
 abstract class ECHEC extends ExtdEnum {
 	const __default = self::NONE;
 	const NONE =	0;
@@ -19,6 +62,7 @@ abstract class TICKET extends ExtdEnum {
 					];
 }
 
+// PREFERENCES
 abstract class PREFS extends ExtdEnum {
 	// Apercu bb code à la frappe
 	const APERCU_BB = [	'name' =>		'bbLive',
@@ -27,6 +71,7 @@ abstract class PREFS extends ExtdEnum {
 					]; 
 }
 
+// INTERFACE
 interface Session {
 	// CONSTANTS
 	// Bannisseement
@@ -37,9 +82,8 @@ interface Session {
 	const HOME = 'Musee/';
 	// Fichiers considérés trop vieux
 	const DELAY_OLDFILE = 1800; // 1800s = 30min
-// Sel de chiffrage
-//const SALT = 'bf156è§4563ko%2545FTYfecqnibh54fvdwbhgyiG';
-
+	// Sel de chiffrage
+	//const SALT = 'bf156è§4563ko%2545FTYfecqnibh54fvdwbhgyiG';
 
 	// METHODS
 	// Set defaults and start session
@@ -57,6 +101,7 @@ interface Session {
 	public static function updateCookies();
 	
 	// Instance methods
+	public function print_errors();
 	// Try to login (send connect form)
 	public function startSession();
 	// Called when loading page to check if logged
@@ -64,13 +109,11 @@ interface Session {
 	public function checkSession ($fullCheck = false);
 	// LogOut
 	public function logout($target = self::HOME);
-	// Print session error
-	public function print_error ();
-	
 	// Unban an IP
 	public function freeIp($db, $ip, $type);
 }
 
+// FINAL CLASS SessionManagement
 final class SessionManagement implements Session
 {
 	
@@ -78,7 +121,7 @@ final class SessionManagement implements Session
 	//immutable
 	private $Table; 
 	//mutable
-	private $Error = ERR::__default;
+	private $Errors = [];
 	
 	// Constructor
 	function __construct () {
@@ -86,7 +129,7 @@ final class SessionManagement implements Session
 			session_start();
 		
 		if (isset($_GET['error']) && ERR::hasKey($_GET['error']))
-			$this->Error = $_GET['error'];
+			array_push ($this->Errors, $_GET['error']);
 		
 		include ('../Config/config.php');
 		$this->Table = $prefixe.'echecs';
@@ -148,6 +191,11 @@ final class SessionManagement implements Session
 	}
 
 	// Public
+	// Return errors
+	public function print_errors() {
+		return SESS_ERR::print_errors($this->Errors);
+	}
+	
 	// Try to start session
 	public function startSession() {
 		$target = self::ADMIN_HOME;
@@ -177,8 +225,8 @@ final class SessionManagement implements Session
 			    	$bdd = NULL;
 			    	session_destroy();
 			    	if ($target != self::ADMIN_HOME)
-			    		$this->jumpToTarget('Administration/index.php?error='.ERR::BANNED.'&goto='.$target);
-					else $this->jumpToTarget('Administration/index.php?error='.ERR::BANNED);
+			    		$this->jumpToTarget('Administration/index.php?error='.SESS_ERR::BANNED.'&goto='.$target);
+					else $this->jumpToTarget('Administration/index.php?error='.SESS_ERR::BANNED);
 
 			    	return false;
 			    }
@@ -190,8 +238,8 @@ final class SessionManagement implements Session
 				$bdd = NULL;
 				session_destroy();
 		    	if ($target != self::ADMIN_HOME)
-		    		$this->jumpToTarget('Administration/index.php?error='.ERR::LOGIN.'&goto='.$target);
-				else $this->jumpToTarget('Administration/index.php?error='.ERR::LOGIN);
+		    		$this->jumpToTarget('Administration/index.php?error='.SESS_ERR::LOGIN.'&goto='.$target);
+				else $this->jumpToTarget('Administration/index.php?error='.SESS_ERR::LOGIN);
 				return false;
 			}
 			else {
@@ -211,8 +259,8 @@ final class SessionManagement implements Session
 					$bdd = NULL;
 					session_destroy();
 			    	if ($target != self::ADMIN_HOME)
-			    		$this->jumpToTarget('Administration/index.php?error='.ERR::PASS.'&goto='.$target);
-					else $this->jumpToTarget('Administration/index.php?error='.ERR::PASS);
+			    		$this->jumpToTarget('Administration/index.php?error='.SESS_ERR::PASS.'&goto='.$target);
+					else $this->jumpToTarget('Administration/index.php?error='.SESS_ERR::PASS);
 					return false;
 				}
 				else {
@@ -316,35 +364,6 @@ final class SessionManagement implements Session
 			setcookie($cookie['name'], '', 1);
 		session_destroy();
 		$this->jumpToTarget($target);
-	}
-
-	// Print error & return true if banned
-	public function print_error () {
-		switch ($this->Error) {
-			case ERR::OK: break;
-			case ERR::LOGIN:
-				echo '<h3 class="alert">Membre inconnu</h3>';
-    			break;
-			case ERR::PASS:
-				echo '<h3 class="alert">Mot de passe erroné</h3>';
-    			break;
-			case ERR::BANNED:
-		    	echo '<h3 class="alert">Votre adresse IP est bannie</h3>';
-		    	echo '<p class="alert">En raison d\'une activité suspecte, votre adresse a été bannie du serveur pour 24 heures. Revenez plus tard ou contactez l\'administrateur pour plus d\'informations.</p>';
-		    	return true;
-			case ERR::COOKIE:
-		    	echo '<h3 class="alert">Merci d\'autoriser les "cookies" pour ce site</h3>';
-		    	echo '<p class="alert">Les cookies enregistrent une partie de vos préférences de navigation sur votre ordinateur. Ils sont nécessaires au fonctionnement de cette application et n\'enregistrent aucune donnée personnelle.</p>';
-		    	break;
-
-			default:
-				echo '<h3 class="alert">Erreur(s) inconnue(s) <span class="reduit">(';
-				echo $this->Error;
-				echo ')</span></h3>';
-				break;
-		}
-		
-		return false;
 	}
 	
 	// Unban an IP
