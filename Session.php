@@ -10,31 +10,29 @@ abstract class SESS_ERR extends ERR {
 	
 	// Print errors
 	public static function print_errors ($Errors, $data = []) {
-		foreach ($Errors as $errors) {
-			foreach ($errors as $error) {
-				switch ($error) {
-					case self::LOGIN:
-						echo '<h3 class="alert">Membre inconnu</h3>';
-						break;
-					case self::PASS:
-						echo '<h3 class="alert">Mot de passe erroné</h3>';
-						break;
-					case self::BANNED:
-						echo '<h3 class="alert">Votre adresse IP est bannie</h3>';
-						echo '<p class="alert">En raison d\'une activité suspecte, votre adresse a été bannie du serveur pour 24 heures. Revenez plus tard ou contactez l\'administrateur pour plus d\'informations.</p>';
-						return true;
-					case self::COOKIE:
-						echo '<h3 class="alert">Merci d\'autoriser les "cookies" pour ce site</h3>';
-						echo '<p class="alert">Les cookies enregistrent une partie de vos préférences de navigation sur votre ordinateur. Ils sont nécessaires au fonctionnement de cette application et n\'enregistrent aucune donnée personnelle. Ils seront immédiatement supprimés lors de votre déconnexion</p>';
-						break;
-						
-					default:
-						$Error = 	[	'name' => 'Utilisateur',
-										'type' => $error
-									];
-	   					if (parent::print_errors ($Error, $data) !== false) return true;
-	   					else break;
-				}
+		foreach ($Errors as $error) {
+			switch ($error) {
+				case self::LOGIN:
+					echo '<h3 class="alert">Membre inconnu</h3>';
+					break;
+				case self::PASS:
+					echo '<h3 class="alert">Mot de passe erroné</h3>';
+					break;
+				case self::BANNED:
+					echo '<h3 class="alert">Votre adresse IP est bannie</h3>';
+					echo '<p class="alert">En raison d\'une activité suspecte, votre adresse a été bannie du serveur pour 24 heures. Revenez plus tard ou contactez l\'administrateur pour plus d\'informations.</p>';
+					return true;
+				case self::COOKIE:
+					echo '<h3 class="alert">Merci d\'autoriser les "cookies" pour ce site</h3>';
+					echo '<p class="alert">Les cookies enregistrent une partie de vos préférences de navigation sur votre ordinateur. Ils sont nécessaires au fonctionnement de cette application et n\'enregistrent aucune donnée personnelle. Ils seront immédiatement supprimés lors de votre déconnexion</p>';
+					break;
+					
+				default:
+					$Error = 	[	'name' => 'Utilisateur',
+									'type' => $error
+								];
+   					if (parent::print_errors ($Error, $data) !== false) return true;
+   					else break;
 			}
 		}
 		
@@ -128,7 +126,7 @@ final class SessionManagement implements Session
 		if (session_status() !== PHP_SESSION_ACTIVE)
 			session_start();
 		
-		if (isset($_GET['error']) && ERR::hasKey($_GET['error']))
+		if (isset($_GET['error']) && $_GET['error'] != "")
 			array_push ($this->Errors, $_GET['error']);
 		
 		include ('../Config/config.php');

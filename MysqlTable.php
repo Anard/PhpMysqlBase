@@ -36,7 +36,6 @@ abstract class SQL_ERR extends ERR {
 	const NEED7 =	27;
 	const NEED8 =	28;
 	const NEED9 =	29;
-
 		
 	// other field errors
 	const CORRESPWD =	30;
@@ -359,7 +358,7 @@ abstract class MysqlTable implements Table
 	// GETTERS
 	public function print_errors() {
 		foreach ($this->Fields as $content) {
-			if (SQL_ERR::print_errors ([ $content->Name => $content->Errors ], $this->get_data($this->idLoad) !== false)
+			if (SQL_ERR::print_errors ([ $content->Name => $content->Errors ], $this->get_data($this->idLoad) !== false))
 				return true;
 		}
 		
