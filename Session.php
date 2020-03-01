@@ -2,7 +2,7 @@
 require_once ('ErrorHandling.php');
 
 // ERRORS
-abstract class SESS_ERR extends ERR {
+class SESS_ERR extends ERR {
 	// session
 	const LOGIN =	10;
 	const PASS =	11;
@@ -302,7 +302,7 @@ final class SessionManagement implements Session
 			$this->logout();
 			return false;
 		}
-		return true;
+		else return true;
 	}
 
 	private function _checkSession ($fullCheck = false) {

@@ -15,7 +15,7 @@ require_once ('Session.php');
 require_once ('../Fonctions/texts.php');
 
 // ERRORS
-abstract class SQL_ERR extends ERR {
+class SQL_ERR extends ERR {
 	const INVALID =	-1;	// generic invalid (should not happen as normally ever checked (see update & insert on isValidField))
 	
 	const NOTNUM =	10;
@@ -143,7 +143,7 @@ abstract class SQL_ERR extends ERR {
 
 // ENUMS
 // Mysql data types
-abstract class TYPE extends ExtdEnum
+class TYPE extends ExtdEnum
 {
 	const __default = self::NONE;
 	const NONE =	-1;
@@ -165,7 +165,7 @@ abstract class TYPE extends ExtdEnum
 	const FILE =	30;
 }
 // Rights on tables
-absttract class AUTHORISED extends ExtdEnum
+class AUTHORISED extends ExtdEnum
 {
 	const __default = self::ALL;
 	const ALL =		-1;	// no restriction
@@ -187,13 +187,13 @@ absttract class AUTHORISED extends ExtdEnum
 					];
 }
 // Read/Write access
-abstract class ACCESS extends ExtdEnum {
+class ACCESS extends ExtdEnum {
 	const __default = self::READ;
 	const READ =	0;
 	const WRITE =	1;
 }
 // Get values
-abstract class GET extends ExtdEnum {
+class GET extends ExtdEnum {
 	// default is ID of wanted data
 	// * value will get all in Sql requests when applied to fields
 	const __default = self::ALL;
@@ -392,6 +392,7 @@ abstract class MysqlTable implements Table
 	// Check if authorized
 	private function _rights_control_basics ($read_write = NULL) {
 		if (is_null($read_write)) $read_write = $this->default_access;
+		echo $read_write.' : '.(ACCESS::hasKey($read_write) ? 'ok' : 'ko');
 		if (!ACCESS::hasKey($read_write)) return false;
 		if ($this->rights[$read_write] == AUTHORISED::ALL) return true;
 		if (SessionManagement::isAdmin()) return true;
@@ -1111,6 +1112,9 @@ abstract class UI_MysqlTable implements UI_Table
 	
 	// Properties
 	public static $choixListe = [10, 15, 20, 30];	// choix nb entrées par liste
+
+	// prevent instanciation
+    function __construct() { }
 
 	// Draw Delete form
 	//protected static function _draw_delete_form ($action, $data, $table) {

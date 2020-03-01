@@ -1,7 +1,7 @@
 <?php
 require_once ('Generic.php');
 
-abstract class ERR extends ExtdEnum
+class ERR extends ExtdEnum
 {
 	// initial
 	const __default = self::OK;
@@ -13,7 +13,7 @@ abstract class ERR extends ExtdEnum
 	const ACCESS =	2;
 	
 	// Remplacement de champs dans les textes
-	// Syntaxe : [...] __Field-Name|Default-Value__ [...]
+   	// Syntaxe : [...] __Field_Name|Default-Value__ [...]
 	public static function replaceFields ($text, $data = []) {
 		if (preg_match ('#__([\d\w_-]*)(\|[^_]*)?__#', $text, $fields) == 1) {
 			array_shift($fields);

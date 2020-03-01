@@ -1,7 +1,7 @@
 <?php
 require_once ('MysqlTable.php');
 
-abstract class "CLASS"__ACTION extends ExtdEnum
+class "CLASS"__ACTION extends ExtdEnum
 {
 	const __default = self::ADD;
 	const ADD =		'add"class"';
@@ -73,7 +73,7 @@ final class "Class"Table extends MysqlTable implements "Class"
 }
 
 // ---------- FINAL UI CLASS ------------
-abstract class UI_"Class"Table extends UI_MysqlTable implements UI_"Class"
+final class UI_"Class"Table extends UI_MysqlTable implements UI_"Class"
 {
 	// Constants
 	const CHOIX_LISTE = [10, 15, 20, 30];	// choix nb entrées par liste

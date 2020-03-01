@@ -6,11 +6,10 @@ if (!class_exists('SplEnum')) {
 		
 	    private static $constCacheArray = NULL;
 
-		function __construct() {
-		      // Prevent instanciation
-		}
-		
-	    static function getConstList($include_default = false) {
+		// prevent instanciation
+		private function __construct() { }
+    
+   	    static function getConstList($include_default = false) {
 	        if (self::$constCacheArray == NULL) {
 	            self::$constCacheArray = [];
 	        }
