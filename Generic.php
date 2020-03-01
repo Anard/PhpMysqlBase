@@ -1,13 +1,13 @@
 <?php
 if (!class_exists('SplEnum')) {
-	abstract class SplEnum
+	class SplEnum
 	{
 		const __default = NULL;
 		
 	    private static $constCacheArray = NULL;
 
 		// prevent instanciation
-		private function __construct() { }
+		function __construct() { }
     
    	    static function getConstList($include_default = false) {
 	        if (self::$constCacheArray == NULL) {
@@ -28,7 +28,7 @@ if (!class_exists('SplEnum')) {
 }
 
 
-abstract class ExtdEnum extends SplEnum
+class ExtdEnum extends SplEnum
 {
 	// return true if key have been found
     static function hasKey($key) {

@@ -390,12 +390,11 @@ abstract class MysqlTable implements Table
 	}
 	
 	// Check if authorized
-	private function _rights_control_basics ($read_write = NULL) {
+	private function _rights_control_basics ($read_write = NULL, $userid = 0) {
 		if (is_null($read_write)) $read_write = $this->default_access;
-		echo $read_write.' : '.(ACCESS::hasKey($read_write) ? 'ok' : 'ko');
 		if (!ACCESS::hasKey($read_write)) return false;
 		if ($this->rights[$read_write] == AUTHORISED::ALL) return true;
-		if (SessionManagement::isAdmin()) return true;
+		if ($userid == 0 && SessionManagement::isAdmin()) return true;
 		if ($this->rights[$read_write] == AUTHORISED::PARENT)
 			return $this->Parent->rights_control($read_write);
 		if ($this->rights[$read_write] == AUTHORISED::MMM)
@@ -405,8 +404,8 @@ abstract class MysqlTable implements Table
 	private function _rights_control ($read_write = NULL, $id = 0, $userid = 0) {
 		if (is_null($read_write)) $read_write = $this->default_access;
 		if (!ACCESS::hasKey($read_write)) return false;
-		if ($userid == 0) $userid = SessionManagement::getSessId();
 		if (!is_numeric($id)) $id = 0;
+		if (!is_numeric($userid)) $userid = 0;
 		if (!$this->is_data($id)) $id = 0;	// do not block if id doesn't exist
 		if ($id == 0) {
 			if ($this->rights[$read_write] == AUTHORISED::SELF)	return false;
@@ -414,6 +413,17 @@ abstract class MysqlTable implements Table
 		}
 
 		include ('../Config/config.php');
+		if ($userid == 0) $userid = SessionManagement::getSessId();
+		else {
+			$Table = $prefixe.'users';
+			$reponse = $this->bdd->prepare ('SELECT Admin FROM '.$Table.' WHERE id = :userid');
+			$reponse->bindParam ('userid', $userid, PDO::PARAM_INT);
+			$reponse->execute();
+			$donnees = $reponse->fetch();
+			$reponse->closeCursor();
+			if ($donnees && $donnees['Admin'] == 1) return true;
+		}
+		
 		switch ($this->rights[$read_write]) {
 			case AUTHORISED::SELF:
 				if ($id != SessionManagement::getSessId()) return false;
@@ -443,9 +453,9 @@ abstract class MysqlTable implements Table
 	// Contrôle des droits sur une entrée, push array & return true or false
 	public function rights_control ($read_write = NULL, $id = 0, $userid = 0) {
 		if (is_null($read_write)) $read_write = $this->default_access;
-		$ret = $this->_rights_control_basics ($read_write);
+		$ret = $this->_rights_control_basics ($read_write, $userid);
 		if (!is_bool($ret)) $ret = $this->_rights_control ($read_write, $id, $userid);
-		return $ret; 
+		return $ret;
 	}
 	
 	// Search if data exists from DB

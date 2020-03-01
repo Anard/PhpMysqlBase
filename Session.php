@@ -114,7 +114,6 @@ interface Session {
 // FINAL CLASS SessionManagement
 final class SessionManagement implements Session
 {
-	
 	// Properties
 	//immutable
 	private $Table; 
