@@ -12,7 +12,6 @@ function array_splice_by_key (&$array, $key, $length='ALL', $replacement=array()
 
 // BASE CLASS FOR MYSQL TABLES, have to be extended at least by BASE_ExtendTable
 require_once ('Session.php');
-require_once ('../Fonctions/texts.php');
 
 // ERRORS
 class SQL_ERR extends ERR {
@@ -24,6 +23,7 @@ class SQL_ERR extends ERR {
 	const NOTDATE =	13;
 	const NOTHOUR =	14;
 	const NOTLINK =	15;
+	const NOTCOLOR = 16;
 	
 	// required field
 	const NEEDED =	20;
@@ -664,9 +664,9 @@ abstract class MysqlTable implements Table
 					$reponse->closeCursor();
 				}
 				if ($donnees) {
-					$donnees = $this->secure_data($donnees);
 					// tranform array $donnees in single value;
 					if ($fields != GET::ALL && !is_array($fields)) $donnees = $donnees[$fields];
+					$donnees = $this->secure_data($donnees);
 				}
 				break;
 		}
@@ -761,6 +761,7 @@ abstract class MysqlTable implements Table
 			case TYPE::DATE: return ((preg_match ('#^[0-9]{2,4}-[0-9]{2}-[0-9]{2}$#',$value) == 1) ? SQL_ERR::OK : SQL_ERR::DATE);
 			case TYPE::HOUR: return ((preg_match ('#^([0-1][0-9])|(2[0-3]):[0-5][0-9](:[0-5][0-9])?$#',$value) == 1) ? SQL_ERR::OK : SQL_ERR::HOUR);
 			case TYPE::LINK: return (filter_var($value, FILTER_VALIDATE_URL) ? SQL_ERR::OK : SQL_ERR::NOTLINK);
+			case TYPE::COLOR: return ((preg_match ('/^(#[0-9a-fA-F]{6})|(rgb\((\s*[01]?[0-9]?[0-9]|2[0-4][0-9]|25[0-5]\s*,){2}\s*[01]?[0-9]?[0-9]|2[0-4][0-9]|25[0-5]\s*\))$/',$value) == 1) ? SQL_ERR::OK : SQL_ERR::NOTCOLOR);
 			default: return SQL_ERR::OK;
 		}
 	}
@@ -777,37 +778,6 @@ abstract class MysqlTable implements Table
 				if ($value != "") return ($this->isValidValue ($field, $value) === SQL_ERR::OK);
 				else return $this->Fields[$field]->Required;
 		}
-	}
-	
-	// Sécurisation des données issues de la BDD
-	protected function secure_data ($data) {
-		foreach ($data as $key => &$value) {
-			if (!array_key_exists($key, $this->Fields)) continue;
-			switch ($this->Fields[$key]->Type) {
-				case TYPE::ID:
-				case TYPE::PARENT:
-				case TYPE::NUM:
-					break;
-					
-				case TYPE::DATE:
-					$value = afficheDate($value);
-					break;
-				case TYPE::HOUR:
-					$value = afficheTime($value);
-					break;
-					
-				case TYPE::BOOL:
-					$value = ($value ? true : false);
-					break;
-					
-				default:
-					$value = secureText($value);
-					break;	
-			}
-		}
-		unset($value); // break the reference with the last element
-		
-		return $data;
 	}
 			
 	// SETTERS
@@ -1025,12 +995,12 @@ abstract class MysqlTable implements Table
 		$fullValues = implode(', ', $echoValues);
 		$req = 'INSERT INTO '.$this->Table.' ( '.$fullFields.' ) VALUES ( '.$fullValues.' )';
 		$reponse = $this->bdd->prepare($req);
-print_r($_POST); echo '<br ?>';
-print_r($fields);
+
 		foreach ($fields as $field => $value) {
 			switch ($this->Fields[$field]->Type) {
+				case TYPE::PARENT:
 				case TYPE::NUM:
-					$reponse->bindParam(strtolower($field), $value, PDO::PARAM_INT);
+					$reponse->bindParam(strtolower($field), $this->format_data($field, $value), PDO::PARAM_INT);
 					break;	
 				default:
 					$reponse->bindValue(strtolower($field), $this->format_data($field, $value));
@@ -1071,19 +1041,73 @@ print_r($fields);
 		}
 
 		return $donnees['id'];
-}
+	}
 	
-	// Mise en forme des données pour enregistrement dans la BDD
+	// Secure array for printing
+	protected function secure_data ($data) {
+		foreach ($data as $key => &$value) {
+			if (!array_key_exists($key, $this->Fields)) continue;
+			if ($value != "")
+				$value = $this->_secure_data ($value, $this->Fields[$key]->Type);
+		}
+		unset($value); // break the reference with the last element
+		
+		return $data;
+	}
+	
+	// Mise en forme des données pour enregistrement vers la BDD
+	private function formatDate ($date) {
+		if (preg_match ('#^([\d]{1,2})\/([\d]{1,2})\/([\d]{2,4})$#', $date) == 1)
+			$date = preg_replace ('#^([\d]{1,2})\/([\d]{2})\/([\d]{2,4})$#', '$3-$2-$1', $date);
+		if (intval(date('Y', strtotime($date)) < 2018)) return "";
+		return date('Y-m-d', strtotime($date));
+	}
+	private function formatTime ($time) {
+		return date('His', strtotime($time));
+	}
+	private function removeSpaces ($data) {
+		return preg_replace ('#\s#', '', $data);
+	}
 	private function format_data ($field, $data) {
 		if (array_key_exists($field, $this->Fields)) $type = $this->Fields[$field]->Type;
 		elseif (TYPE::hasKey($field)) $type = $field;
 		else return NULL;
 		
 		switch ($type) {
-			case TYPE::DATE: return formatDate($data);
-			case TYPE::HOUR: return formatTime($data);
+			case TYPE::DATE: return $data->format('Y-m-d');
+			case TYPE::HOUR: return $this->formatTime($data);
 			case TYPE::BOOL: return ($data ? 1 : 0);
+			case TYPE::COLOR: return $this->removeSpaces($data);
 			default: return $data;	
+		}
+	}
+	
+	// Récupération d'une donnée d'un type précis (BDD ou entrée utilisateur)
+	// ------------ DOIT DEVENIR PRIVEE --------------- //
+	private function _secure_data ($data, $type = TYPE::NONE) {
+		switch ($type) {
+			case TYPE::BOOL:
+				return ($data ? true : false);
+			case TYPE::ID:
+			case TYPE::PARENT:
+			case TYPE::NUM:
+				return intval($data);
+
+			case TYPE::DATE:
+				if (preg_match ('#^[0-9]+$#', $data) == 1)
+					return new DateTime (strtotime($data));
+				else return DateTime::createFromFormat ('Y-m-d', $data);
+				//return date('j/m/Y', strtotime($data));
+			case TYPE::HOUR:
+				return date('H:m', strtotime($data));
+			
+			case TYPE::COLOR:
+				return preg_replace('#\s#', '', UI_MysqlTable::secureText($data));
+			case TYPE::MAIL:
+				return str_replace('@', ' [AT] ', UI_MysqlTable::secureText($data));
+				
+			default:
+				return UI_MysqlTable::secureText($data);
 		}
 	}
 	
@@ -1126,8 +1150,25 @@ abstract class UI_MysqlTable implements UI_Table
 	// prevent instanciation
     function __construct() { }
 
+	// GENERICS
+	public static function secureText($texte) {
+		return htmlentities($texte, ENT_QUOTES);
+	}
+	protected static function afficheDate($date, $dest = 'write') {
+		switch ($dest) {
+			case 'form':	return $date->format('Y-m-d');
+			case 'short':	return $date->format('j/m/y');
+			default:		return $date->format('j/m/Y');
+		}
+	}
+	protected static function afficheMail($mail) {
+		return str_replace (' [AT] ', '@', $mail);
+	}
+	
+
+	// SPECIFICS
+	
 	// Draw Delete form
-	//protected static function _draw_delete_form ($action, $data, $table) {
 	protected static function _draw_delete_form ($action, $data, $table, $texte) {
 		do {
 			if (next ($data) === false) break;
@@ -1258,7 +1299,7 @@ abstract class UI_MysqlTable implements UI_Table
 				// lien JS
 				$url = $listbase.$complement;
 				echo '<a title="Première page" ';
-				if ($prec == 0) echo 'style="visibility: hidden;" ';
+				if ($listData['prec'] == 0) echo 'style="visibility: hidden;" ';
 				echo 'onclick="load(\''.$url.'\',\''.$_SERVER['SCRIPT_NAME'].'\'); return false;" ';
 				// lien dur
 				$url = $urlbase.$complement.'?deployside='.$deploy;

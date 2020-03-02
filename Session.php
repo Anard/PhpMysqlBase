@@ -456,14 +456,14 @@ final class SessionManagement implements Session
 	}
 	
 	private function cleanTempDir () {
-		require_once ('../Admin/config.php');
+		require_once ('../ClassesBase/FileHandling.php');
 		$now = time();
-		if ($dossier = opendir (PATH_UPLOAD['tmp'])) {
+		if ($dossier = opendir (FileManagement::PATH_UPLOAD['tmp'])) {
 			while (false !== ($file = readdir($dossier))) {
 			    if ($file != '.' && $file != '..' && $file != 'index.php') {
-			    	$date = filemtime (PATH_UPLOAD['tmp'].$file);
+			    	$date = filemtime (FileManagement::PATH_UPLOAD['tmp'].$file);
 			    	if ($date < $now - self::DELAY_OLDFILE) {
-			    		if (file_exists(PATH_UPLOAD['tmp'].$file)) unlink (PATH_UPLOAD['tmp'].$file);
+			    		if (file_exists(FileManagement::PATH_UPLOAD['tmp'].$file)) unlink (FileManagement::PATH_UPLOAD['tmp'].$file);
 			    	}
 			    }
 			}
