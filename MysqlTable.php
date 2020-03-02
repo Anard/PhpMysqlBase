@@ -12,6 +12,7 @@ function array_splice_by_key (&$array, $key, $length='ALL', $replacement=array()
 
 // BASE CLASS FOR MYSQL TABLES, have to be extended at least by BASE_ExtendTable
 require_once ('Session.php');
+require_once ('FileHandling.php');
 
 // ERRORS
 class SQL_ERR extends ERR {
@@ -74,7 +75,7 @@ class SQL_ERR extends ERR {
 						break;
 					case self::NOTLINK:
 	   					echo '<h3 class="alert">Lien invalide</h3>';
-	   					echo '<p class="alert">Le lien foourni est invalide</p>';
+	   					echo '<p class="alert">Le lien fourni est invalide</p>';
 						break;
 	   				
 					case self::NEEDED:
@@ -126,6 +127,13 @@ class SQL_ERR extends ERR {
 	   					echo '</span></h3>';
 	   					break;
 	   					
+	   				case self::FILE:
+						$Error = 	[	'name' => $name,
+										'type' => $error
+									];
+	   					if (FileManagement::print_errors ($Error, $data) !== false) return true;
+	   					else break;
+	   				
 					default:
 						$Error = 	[	'name' => $name,
 										'type' => $error
@@ -283,6 +291,7 @@ abstract class MysqlTable implements Table
 	protected $Fields = array();	// list of fields
 	protected $bdd;					// bdd
 	protected $default_access;		// default ACCESS value
+	protected $FileMgmt = array();	// File management
 	// readable au niveau supérieur (getter)
 	protected $table;				// name of Mysql base table
 	protected $idLoad;				// Page loaded id
@@ -325,9 +334,9 @@ abstract class MysqlTable implements Table
 		$this->default_access = ACCESS::getKey($read_write);
 		$this->idLoad = $this->Defaults['id'];
 		foreach ($this->Fields as $field => $content) {
-			if ($content->Type == TYPE::PARENT) {
-				$this->parentItem = $field;
-				break;
+			switch ($content->Type) {
+				case TYPE::PARENT: $this->parentItem = $field; break;
+				default: break;
 			}
 		}
 		
@@ -493,6 +502,7 @@ abstract class MysqlTable implements Table
 				else break;
 		}
 
+		// select fields
 		if ($fields != GET::ALL) {
 			if (is_array($fields)) {
 				$arrayFields = $fields;
@@ -506,10 +516,13 @@ abstract class MysqlTable implements Table
 			elseif (!array_key_exists($fields, $this->Fields)) return NULL;
 		}
 
+		// get data
 		$limit = "";
 		switch ($get) {
 			// Get list
 			case GET::LIST:
+				// Authorised list
+				//$total = 0;
 				// If Parent is defined, LIST is Parent's full list
 				if ($this->Parent !== NULL) {
 					if ($this->Limiting != "") $limit = ' AND '.$this->Limiting;
@@ -536,9 +549,7 @@ abstract class MysqlTable implements Table
 					return $donnees;
 				}
 		
-				// Authorised list
-				$total = 0;
-				if (SessionManagement::isAdmin()) {
+				elseif (SessionManagement::isAdmin()) {
 					if ($this->Limiting != "") $limit = ' WHERE '.$this->Limiting;
 					$reponse = $this->bdd->prepare ('SELECT '.$fields.' FROM '.$this->Table.$limit.$this->getOrdering().' LIMIT :nombre OFFSET :debut');
 				}
@@ -673,8 +684,8 @@ abstract class MysqlTable implements Table
 				}
 				if ($donnees) {
 					// tranform array $donnees in single value;
-					if ($fields != GET::ALL && !is_array($fields)) $donnees = $donnees[$fields];
-					$donnees = $this->secure_data($donnees);
+					if ($fields != GET::ALL && !is_array($fields)) $donnees = $this->_secure_data ($donnees[$fields], $this->Fields[$fields]->Type);
+					else $donnees = $this->secure_data($donnees);
 				}
 				break;
 		}
@@ -710,7 +721,7 @@ abstract class MysqlTable implements Table
 		SessionManagement::updateCookies();
 		
 		// prepare data
-		$validatedValues = $this->_validate_posted_data($postedValues);
+		$validatedValues = $this->_validate_posted_data($this->secure_data($postedValues));
 		// post
 		return $this->_record_changes ($validatedValues);
 	}
@@ -763,14 +774,16 @@ abstract class MysqlTable implements Table
 				return ($this->is_data($value) ? SQL_ERR::OK : SQL_ERR::UNKNOWN);
 			case TYPE::PARENT:
 				return ($this->Parent->is_data($value) ? SQL_ERR::OK : SQL_ERR::UNKNOWN);				
-			case TYPE::NUM: return (is_numeric($value) ? SQL_ERR::OK : SQL_ERR::NOTNUM);
-			case TYPE::MAIL: return (filter_var($value, FILTER_VALIDATE_EMAIL) ? SQL_ERR::OK : SQL_ERR::NOTMAIL);
-			case TYPE::TEL: return ((preg_match ('#^[0-9]{10}$#', preg_replace ('#\s#', '', $value)) == 1) ? SQL_ERR::OK : SQL_ERR::NOTTEL);
-			case TYPE::DATE: return ((preg_match ('#^[0-9]{2,4}-[0-9]{2}-[0-9]{2}$#',$value) == 1) ? SQL_ERR::OK : SQL_ERR::DATE);
-			case TYPE::HOUR: return ((preg_match ('#^([0-1][0-9])|(2[0-3]):[0-5][0-9](:[0-5][0-9])?$#',$value) == 1) ? SQL_ERR::OK : SQL_ERR::HOUR);
-			case TYPE::LINK: return (filter_var($value, FILTER_VALIDATE_URL) ? SQL_ERR::OK : SQL_ERR::NOTLINK);
-			case TYPE::COLOR: return ((preg_match ('/^(#[0-9a-fA-F]{6})|(rgb\((\s*[01]?[0-9]?[0-9]|2[0-4][0-9]|25[0-5]\s*,){2}\s*[01]?[0-9]?[0-9]|2[0-4][0-9]|25[0-5]\s*\))$/',$value) == 1) ? SQL_ERR::OK : SQL_ERR::NOTCOLOR);
-			default: return SQL_ERR::OK;
+			case TYPE::NUM:		return (is_numeric($value) ? SQL_ERR::OK : SQL_ERR::NOTNUM);
+			case TYPE::MAIL:	return (filter_var($value, FILTER_VALIDATE_EMAIL) ? SQL_ERR::OK : SQL_ERR::NOTMAIL);
+			case TYPE::TEL:		return ((preg_match ('#^[0-9]{10}$#', preg_replace ('#\s#', '', $value)) == 1) ? SQL_ERR::OK : SQL_ERR::NOTTEL);
+			case TYPE::DATE: //return ((preg_match ('#^[0-9]{2,4}-[0-9]{2}-[0-9]{2}$#', $value) == 1) ? SQL_ERR::OK : SQL_ERR::DATE);
+								return ($value !== false ? SQL_ERR::OK : SQL_ERR::NOTDATE);
+			case TYPE::HOUR:	return ((preg_match ('#^([0-1][0-9])|(2[0-3]):[0-5][0-9](:[0-5][0-9])?$#',$value) == 1) ? SQL_ERR::OK : SQL_ERR::HOUR);
+			case TYPE::LINK:	return (filter_var($value, FILTER_VALIDATE_URL) ? SQL_ERR::OK : SQL_ERR::NOTLINK);
+			case TYPE::COLOR:	return ((preg_match ('/^(#[0-9a-fA-F]{6})|(rgb\((\s*[01]?[0-9]?[0-9]|2[0-4][0-9]|25[0-5]\s*,){2}\s*[01]?[0-9]?[0-9]|2[0-4][0-9]|25[0-5]\s*\))$/',$value) == 1) ? SQL_ERR::OK : SQL_ERR::NOTCOLOR);
+			
+			default:			return SQL_ERR::OK;
 		}
 	}
 	
@@ -1063,35 +1076,7 @@ abstract class MysqlTable implements Table
 		return $data;
 	}
 	
-	// Mise en forme des données pour enregistrement vers la BDD
-	private function formatDate ($date) {
-		if (preg_match ('#^([\d]{1,2})\/([\d]{1,2})\/([\d]{2,4})$#', $date) == 1)
-			$date = preg_replace ('#^([\d]{1,2})\/([\d]{2})\/([\d]{2,4})$#', '$3-$2-$1', $date);
-		if (intval(date('Y', strtotime($date)) < 2018)) return "";
-		return date('Y-m-d', strtotime($date));
-	}
-	private function formatTime ($time) {
-		return date('His', strtotime($time));
-	}
-	private function removeSpaces ($data) {
-		return preg_replace ('#\s#', '', $data);
-	}
-	private function format_data ($field, $data) {
-		if (array_key_exists($field, $this->Fields)) $type = $this->Fields[$field]->Type;
-		elseif (TYPE::hasKey($field)) $type = $field;
-		else return NULL;
-		
-		switch ($type) {
-			case TYPE::DATE: return $data->format('Y-m-d');
-			case TYPE::HOUR: return $this->formatTime($data);
-			case TYPE::BOOL: return ($data ? 1 : 0);
-			case TYPE::COLOR: return $this->removeSpaces($data);
-			default: return $data;	
-		}
-	}
-	
 	// Récupération d'une donnée d'un type précis (BDD ou entrée utilisateur)
-	// ------------ DOIT DEVENIR PRIVEE --------------- //
 	private function _secure_data ($data, $type = TYPE::NONE) {
 		switch ($type) {
 			case TYPE::BOOL:
@@ -1116,6 +1101,33 @@ abstract class MysqlTable implements Table
 				
 			default:
 				return UI_MysqlTable::secureText($data);
+		}
+	}
+	
+	// Mise en forme des données pour enregistrement vers la BDD
+	private function formatDate ($date) {
+		if (preg_match ('#^([\d]{1,2})\/([\d]{1,2})\/([\d]{2,4})$#', $date) == 1)
+			$date = preg_replace ('#^([\d]{1,2})\/([\d]{2})\/([\d]{2,4})$#', '$3-$2-$1', $date);
+		if (intval(date('Y', strtotime($date)) < 2018)) return "";
+		return date('Y-m-d', strtotime($date));
+	}
+	private function formatTime ($time) {
+		return date('His', strtotime($time));
+	}
+	private function removeSpaces ($data) {
+		return preg_replace ('#\s#', '', $data);
+	}
+	private function format_data ($field, $data) {
+		if (array_key_exists($field, $this->Fields)) $type = $this->Fields[$field]->Type;
+		elseif (TYPE::hasKey($field)) $type = $field;
+		else return NULL;
+		
+		switch ($type) {
+			case TYPE::DATE: return $data->format('Y-m-d');
+			case TYPE::HOUR: return $this->formatTime($data);
+			case TYPE::BOOL: return ($data ? 1 : 0);
+			case TYPE::COLOR: return $this->removeSpaces($data);
+			default: return $data;	
 		}
 	}
 	
