@@ -43,10 +43,10 @@ final class "Class"Table extends MysqlTable implements "Class"
 		$this->set_field('id', TYPE::ID, 'Nom');
 		$this->set_field('Field', "TYPE", 'nom dans les erreurs', "required", "unique");
 		// Init consts
-		$this->Defaults = $this->secure_data(array(
+		$this->Defaults = array(
 			"id" => 0,
 			"Field" => "DEFAULT VALUE"
-		));
+		);
 		
 		return parent::_constructExit($read_write, "LOAD_GET_VARIABLE_NAME (=idload)");
 	}

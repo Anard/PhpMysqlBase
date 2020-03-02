@@ -371,11 +371,19 @@ abstract class MysqlTable implements Table
 	}
 
 	// Get defaults
-	public function getDefaults($field = GET::ALL) {
-		if ($field == GET::ALL)
-			return $this->Defaults;
-		elseif (isset($this->Defaults[$field]))
-			return $this->Defaults[$field];
+	public function getDefaults($fields = GET::ALL) {
+		if ($fields == GET::ALL)
+			return $this->secure_data($this->Defaults);
+		elseif (is_array($fields)) {
+			$ret = [];
+			foreach ($fields as $field) {
+				if (!array_key_exists ($field, $this->Fields)) continue;
+				array_push ($ret, $this->Defaults[$field]);
+			}
+			return $this->secure_data($ret);
+		}
+		elseif (array_key_exists ($fields, $this->Fields))
+			return $this->_secure_data($this->Defaults[$fields], $this->Fields[$fields]->Type);
 		else return NULL;
 	}
 
