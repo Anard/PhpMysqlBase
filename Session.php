@@ -6,7 +6,9 @@ class SESS_ERR extends ERR {
 	// session
 	const LOGIN =	10;
 	const PASS =	11;
-	const BANNED =	12;
+	const EXPIRE =	12;
+	const BANNED =	20;
+	const COOKIE =	21;
 	
 	// Print errors
 	public static function print_errors ($Errors, $data = []) {
@@ -17,6 +19,10 @@ class SESS_ERR extends ERR {
 					break;
 				case self::PASS:
 					echo '<h3 class="alert">Mot de passe erroné</h3>';
+					break;
+				case self::EXPIRE:
+					echo '<h3 class="alert">Votre session a expiré</h3>';
+					echo '<p class="alert">Meci de bien vouloir vous reconnecter.</p>';
 					break;
 				case self::BANNED:
 					echo '<h3 class="alert">Votre adresse IP est bannie</h3>';
@@ -76,8 +82,8 @@ interface Session {
 	const COOKIESTOBAN = 2;
 	const PASSWDSTOBAN = 5;
 	// Redirections habitelles
-	const ADMIN_HOME = 'Administration/Users.php';
-	const HOME = 'Musee/';
+	const ADMIN_HOME = 'Users.php';
+	const HOME = '../Musee/';
 	// Fichiers considérés trop vieux
 	const DELAY_OLDFILE = 1800; // 1800s = 30min
 	// Sel de chiffrage
@@ -199,7 +205,7 @@ final class SessionManagement implements Session
 		// Check special target
 		if (isset($_POST['goto'])) {
 			
-			if (preg_match('#^\/Administration\/((Users?([0-9]*))|(News([0-9]*))|(Asso(s)?([0-9]*)(-([0-9]*))?)|(Agenda([0-9]*))|(Agenda-([0-9]+))|(Galerie([0-9]*))|(Album([0-9]*))|(confirmDate-([0-9]+)))$#', $_POST['goto']) > 0)
+			if (preg_match('#^((Users?([0-9]*))|(News([0-9]*))|(Asso(s)?([0-9]*)(-([0-9]*))?)|(Agenda([0-9]*))|(Agenda-([0-9]+))|(Galerie([0-9]*))|(Album([0-9]*))|(confirmDate-([0-9]+))(\.(php|html?)))$#', $_POST['goto']) > 0)
 				$target = $_POST['goto'];
 		}
 		
@@ -222,8 +228,8 @@ final class SessionManagement implements Session
 			    	$bdd = NULL;
 			    	session_destroy();
 			    	if ($target != self::ADMIN_HOME)
-			    		$this->jumpToTarget('Administration/index.php?error='.SESS_ERR::BANNED.'&goto='.$target);
-					else $this->jumpToTarget('Administration/index.php?error='.SESS_ERR::BANNED);
+			    		$this->jumpToTarget('index.php?error='.SESS_ERR::BANNED.'&goto='.$target);
+					else $this->jumpToTarget('index.php?error='.SESS_ERR::BANNED);
 
 			    	return false;
 			    }
@@ -235,8 +241,8 @@ final class SessionManagement implements Session
 				$bdd = NULL;
 				session_destroy();
 		    	if ($target != self::ADMIN_HOME)
-		    		$this->jumpToTarget('Administration/index.php?error='.SESS_ERR::LOGIN.'&goto='.$target);
-				else $this->jumpToTarget('Administration/index.php?error='.SESS_ERR::LOGIN);
+		    		$this->jumpToTarget('index.php?error='.SESS_ERR::LOGIN.'&goto='.$target);
+				else $this->jumpToTarget('index.php?error='.SESS_ERR::LOGIN);
 				return false;
 			}
 			else {
@@ -256,8 +262,8 @@ final class SessionManagement implements Session
 					$bdd = NULL;
 					session_destroy();
 			    	if ($target != self::ADMIN_HOME)
-			    		$this->jumpToTarget('Administration/index.php?error='.SESS_ERR::PASS.'&goto='.$target);
-					else $this->jumpToTarget('Administration/index.php?error='.SESS_ERR::PASS);
+			    		$this->jumpToTarget('index.php?error='.SESS_ERR::PASS.'&goto='.$target);
+					else $this->jumpToTarget('index.php?error='.SESS_ERR::PASS);
 					return false;
 				}
 				else {
@@ -305,15 +311,13 @@ final class SessionManagement implements Session
 	}
 
 	private function _checkSession ($fullCheck = false) {
-		// Session not started, redirect to login page with path to requeested page
-		if ($fullCheck && !isset($_SESSION['Login'])) {
-			$this->logout('Administration/index.php?goto='.$_SERVER['REQUEST_URI']);
-			return true;
-		}
-		
 		// Check existing Ticket
 		if (!isset($_COOKIE[TICKET::COOKIE['name']]) || !isset($_SESSION[TICKET::SESSION['name']])) {
-			return false;
+			$target = end (explode ('/', $_SERVER['REQUEST_URI']));
+			if ($target != self::ADMIN_HOME)
+				$this->logout('index.php?error='.SESS_ERR::EXPIRE.'&goto='.$target);
+			else $this->logout('index.php?error='.SESS_ERR::EXPIRE);
+			return true;
 		}
 		
 		if ($fullCheck) include ('../Config/connexion.php');
@@ -396,9 +400,10 @@ final class SessionManagement implements Session
 	// GETTERS
 	// Jump with header redirect
 	private function jumpToTarget ($target = self::HOME) {
-		if (!headers_sent())
-			header ('Location: ../'.$target);
-		
+		if (!headers_sent()) {
+			if (substr($target, 0, 1) != '.') $target = '../Administration/'.$target;
+			header ('Location: '.$target);
+		}
 		// SEE HOW TO JUMP WITHOUT HEADER FUNCTION
 		else exit();
 	}

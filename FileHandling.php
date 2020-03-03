@@ -8,26 +8,40 @@ class FILE_ERR extends ERR {
 	const UPLOAD =	20;
 	
 	// Print errors
-	public static function print_errors ($Error, $data = []) {
+	public static function print_errors ($Error, $data = [	'name' => "",
+															'size' => "",
+															'type' => ""
+										])
+	{
+		$message = "";
 		switch ($Error['type']) {
 			case self::NOFILE:
-				echo '<h3 class="alert">Le fichier '.$data['nom'].' est introuvable.</h3>';
+				$message = '<h3 class="alert">Le fichier '.$data['name'].' est introuvable.</h3>';
 				break;
 			case self::SIZE:
-				echo '<h3 class="alert">Votre fichier est trop volumineux</h3>';
-				echo '<p class="alert">Merci de respecter la limite des '.($data['size'] / 1000000).'Mo par fichier.</p>';
+				$message = '<h3 class="alert">Votre fichier est trop volumineux</h3>';
+				$message .= '<p class="alert">Merci de respecter la limite des '.($data['size'] / 1000000).'Mo par fichier.</p>';
 				break;
 			case self::TYPE:
-				echo '<h3 class="alert">Votre fichier est de type incorrect</h3>';
-				echo '<p class="alert">Merci de choisir un fichier parmi les formats supportés : ';
-				echo implode (', ', $data['type']);
-				echo '.</p>';
+				$message = '<h3 class="alert">Votre fichier est de type incorrect</h3>';
+				$message .= '<p class="alert">Merci de choisir un fichier parmi les formats supportés : ';
+				foreach ($data['type'] as $types)
+					$arrayTypes[] = implode (', ', $types);
+				$message .= implode (', ', $arrayTypes);
+				$message .= '.</p>';
 				break;
 			case self::UPLOAD:
-				echo '<h3 class="alert">Un erreur est survenue pendant le téléchargement de votre fichhier</h3>';
+				$message = '<h3 class="alert">Un erreur est survenue pendant le téléchargement de votre fichier</h3>';
 				break;
+			
+			default:			
+				$Error = 	[	'name' => 'image',
+								'type' => $error
+							];
+				if (parent::print_errors ($Error, $data) !== false) return true;
+				else break;
 		}
-		return false;
+		return $message;
 	}
 }
 
@@ -78,8 +92,10 @@ class File {
 	}
 	
 	// PRIVATE
-	private function validateFileData ($src, $okTypes) {
-		if (!file_exists($src)) throw new Exception(FILE_ERR::NOFILE);
+	private function validateFileData ($src, $okTypes = []) {
+		if (!file_exists($src)) throw new Exception(	FILE_ERR::print_errors(	['type' => FILE_ERR::NOFILE],
+																				['name'	=> $src, 'type' => $okTypes]),
+														FILE_ERR::NOFILE );
 		// get handlers
 		$testedImage = false;
 		$handlers = NULL;
@@ -102,12 +118,13 @@ class File {
 			}
 			if ($handlers != NULL) break;
 		}
-		if (!in_array($handlers['type'], $okTypes))
-			throw new Exception(FILE_ERR::TYPE);
+
+		if ($handlers == NULL) throw new Exception(	FILE_ERR::print_errors(	['type' => FILE_ERR::TYPE],
+																			['name'	=> $src, 'type' => $okTypes]),
+														FILE_ERR::TYPE );
 
 		$this->Path = $src;
 		$this->Type = $handlers;
-		return FILE_ERR::OK;
 	}
 }
 
@@ -151,7 +168,9 @@ class FileManagement implements FileInterface
 	// Methods
 	// Construct : maxSize (Mo), list of supported types
     function __construct ($maxSize, $types = array(), $file = NULL) {
-    	if (!is_numeric ($maxSize)) throw FILE_ERR::KO;
+    	if (!is_numeric ($maxSize)) throw new Exception(	FILE_ERR::print_errors(	['type' => FILE_ERR::KO],
+																					['name'	=> $file]),
+															FILE_ERR::KO );
     	$this->MaxSize = $maxSize * 1000000;
     	
     	foreach ($types as $type) {
@@ -159,7 +178,9 @@ class FileManagement implements FileInterface
 				array_push ($this->Types, $type);
     		}
     	}
-    	if (sizeof ($this->Types) == 0) throw FILE_ERR::TYPE;
+    	if (sizeof ($this->Types) == 0) throw new Exception(	FILE_ERR::print_errors(	['type' => FILE_ERR::KO],
+																						['name'	=> $file]),
+																FILE_ERR::KO );
     	
     	if ($file) {
     		try { $this->File = new File ($file, $this->Types); }
@@ -177,10 +198,11 @@ class FileManagement implements FileInterface
 	
 	// Preload file in tmp dir (updload via JS)
 	public function preload ($field) {
-		try { $File = new File ($_FILES[$field]['tmp_name'], $this->Types); }
-		catch (Exception $err) { echo $err; }
-		
-		echo self::PATH_UPLOAD['tmp'].$this->upload('tmp', $field);
+		try {
+			$File = new File ($_FILES[$field]['tmp_name'], $this->Types);
+			echo self::PATH_UPLOAD['tmp'].$this->upload('tmp', $field);
+		}
+		catch (Exception $err) { echo $err->getMessage(); }
 	}
 	
 	public function upload ($table, $field) {
@@ -236,11 +258,12 @@ class FileManagement implements FileInterface
 		}
 		
 		// Contrôle du format
-		try { $file = new File ($_FILE['name'], $this->Types); }
-		catch (Exception $err) { return $err; }
-		
-		$this->File = $file;
-		return FILE_ERR::OK;
+		try {
+			$file = new File ($_FILE['name'], $this->Types);
+			$this->File = $file;
+			return FILE_ERR::OK;
+		}
+		catch (Exception $err) { return $err->getCode; }
 	}
 
 	/**
