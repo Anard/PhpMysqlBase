@@ -282,13 +282,14 @@ abstract class MysqlTable implements Table
 	const DEFAULT_ACCESS = NULL;
 	
 	// Properties
-	protected $Table;			// name of Mysql base table with prefix
-	protected $Parent = NULL;	// Parent de la classe finalle éventuel
-	protected $parentItem; 		// nom de l'id du parent dans la BDD
+	protected $Table;				// name of Mysql base table with prefix
+	protected $Parent = NULL;		// Parent de la classe finalle éventuel
+	protected $parentItem; 			// nom de l'id du parent dans la BDD
+	protected $Children = array(); 	// Enfants de la classe finalle éventuels
 	protected $rights = [	ACCESS::READ => AUTHORISED::__default,
 							ACCESS::WRITE => AUTHORISED::__default
-						];
-	protected $Fields = array();	// list of fields
+						];			// Droits
+	protected $Fields = array();	// List of fields
 	protected $bdd;					// bdd
 	protected $default_access;		// default ACCESS value
 	protected $FileMgmt = array();	// File management
@@ -300,8 +301,8 @@ abstract class MysqlTable implements Table
 	private $Limiting;				// default exclusion when getting data
 	
 	
-	// Constructor => inherit : lien veers la table héritée)
-	function _constructInit ($table, $ordering = "", $limiting = "") {
+	// Constructor => inherit : lien vers la table héritée)
+	function _constructInit ($table, $childsTables = [], $ordering = "", $limiting = "") {
 		if ($this->Parent == NULL) {
 			$connecting = 'insideClass';
 			include ('../Config/connexion.php');
@@ -314,6 +315,8 @@ abstract class MysqlTable implements Table
 		// Init consts
 		$this->table = $table;
 		$this->Table = $prefixe.$table;
+		foreach ($childsTables as $childsTable)
+			array_push ($this->childsTables, $prefixe.$childsTable);
 		// Init fields
 		$reponse = $this->bdd->query('SHOW COLUMNS FROM '.$this->Table);
 		while ($donnees = $reponse->fetch()) {
@@ -924,11 +927,57 @@ abstract class MysqlTable implements Table
 			array_push ($this->Fields['id']->Errors, SQL_ERR::ACCESS);
 			return false;
 		}
-		if (!$this->is_data($id)) {
-			array_push ($this->Fields['id']->Errors, SQL_ERR::UNKNOWN);
-			return false;
+
+		// First delete dependencies
+		// uploaded files
+		$fileFields = array();
+		foreach ($this->Fields as $field) {
+			if ($field->Type == TYPE::FILE)
+				array_push($fileFields, $field);
+		}
+		// if files in table, get data
+		// else only test if entry exists
+		if (sizeof($fileFields) > 0)
+			$fullFields = implode(', ', array_keys($fileFields));
+		else $fullFields = 'id';
+		$reponse = $this->bdd->prepare ('SELECT '.$fullFields.' FROM '.$this->Table.' WHERE id = :id';
+		$reponse->bindParam('id', $id, PDO::PARAM_INT);
+		$ret = $reponse->execute();
+		if (!$ret) return false;
+		// delete files
+		foreach ($fileFields as $field) {
+			if (file_exists($field))
+					unlink ($field);
 		}
 		
+		// childrens & authorisations
+		switch ($this->rights[ACCESS::WRITE]) {
+			case AUTHORISED::ASSO:
+			case AUTHORISED::NEWS:
+				include ('../Config/config.php');
+				$item = AUTHORISED::_ITEM[$this->rights[ACCESS::WRITE]];
+				// Delete children
+				foreach ($childTable as $this->childsTables) {
+					$reponse = $this->bdd->prepare ('DELETE FROM '.$childTable.' WHERE '.$item.' = :id');
+					$reponse->bindParam('id', $id, PDO::PARAM_INT);
+					$ret = $reponse->execute();
+					if (!$ret) return $ret;
+				}
+				// Delete in authorised table, prevent deleting when deleting from a child
+				$Table = $prefixe.AUTHORISED::_TABLE[$this->rights[ACCESS::WRITE]];
+				if ($Table == $this->Table) {
+					$userid = SessionManagement::getSessId();
+					$reponse = $this->bdd->prepare('DELETE FROM '.$Table.' WHERE '.$item.' = :itemid AND id_user = :userid');
+					$reponse->bindParam('itemid', $id, PDO::PARAM_INT);
+					$reponse->bindParam('userid', $userid, PDO::PARAM_INT);
+					$ret = $reponse->execute();
+					$reponse->closeCursor();
+				}
+				break;
+			default: break;
+		}
+		
+		// Finally delete entry
 		$reponse = $this->bdd->prepare('DELETE FROM '.$this->Table.' WHERE id = :id');
 		$reponse->bindParam('id', $id, PDO::PARAM_INT);
 		$ret = ($reponse->execute());
@@ -939,22 +988,6 @@ abstract class MysqlTable implements Table
 			return $ret;
 		}
 
-		// Now delete data in authorised table
-		switch ($this->rights[ACCESS::WRITE]) {
-			case AUTHORISED::ASSO:
-			case AUTHORISED::NEWS:
-				include ('../Config/config.php');
-				$Table = $prefixe.AUTHORISED::_TABLE[$this->rights[ACCESS::WRITE]];
-				$item = AUTHORISED::_ITEM[$this->rights[ACCESS::WRITE]];
-				$userid = SessionManagement::getSessId();
-				$reponse = $this->bdd->prepare('DELETE FROM '.$Table.' WHERE '.$item.' = :itemid AND id_user = :userid');
-				$reponse->bindParam('itemid', $id, PDO::PARAM_INT);
-				$reponse->bindParam('userid', $userid, PDO::PARAM_INT);
-				$ret = $reponse->execute();
-				$reponse->closeCursor();
-				break;
-			default: break;
-		}
 		return $ret;
 	}
 	
@@ -1014,7 +1047,7 @@ abstract class MysqlTable implements Table
 	
 		$fullFields = implode(', ', array_keys($fields));
 		$fullValues = implode(', ', $echoValues);
-		$req = 'INSERT INTO '.$this->Table.' ( '.$fullFields.' ) VALUES ( '.$fullValues.' )';
+		echo $req;
 		$reponse = $this->bdd->prepare($req);
 
 		foreach ($fields as $field => $value) {
