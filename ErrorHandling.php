@@ -30,22 +30,20 @@ class ERR extends ExtdEnum
 	}
 
 	// Print errors
-	public static function print_errors ($Error, $data = []) {
-		switch ($Error['type']) {
+	public static function print_errors ($Error, $data = [], $rplmtStr = '') {
+		switch ($Error) {
 			case self::UNKNOWN:
 				echo '<h3 class="alert">';
-				echo self::replaceFields($Error['name'], $data);
+				echo self::replaceFields($rplmtStr, $data);
 				echo ' introuvable</h3>';
-				return true;	// stop 
+				return true;	// stop
 			case self::ACCESS:
 				echo '<h3 class="alert">Vous n\'avez pas les droits requis pour accéder à cette ressource</h3>';
 				return true;
-				  				
-			case self::OK: break;					
+								
+			case self::OK: break;
 			default:
-				echo '<h3 class="alert">Erreur(s) inconnue(s) <span class="reduit">(';
-				echo $Error['type'];
-				echo ')</span></h3>';
+				echo '<h3 class="alert">Erreur(s) inconnue(s) <span class="reduit">('.$Error.')</span></h3>';
 				break;
 		}
 

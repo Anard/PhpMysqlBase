@@ -93,95 +93,90 @@ class SQL_ERR extends ERR {
 	const DELETE =	42;
 	
 	// Print errors
-	public static function print_errors ($Errors, $data = []) {
-		foreach ($Errors as $name => $errors) {
-			foreach ($errors as $error) {
-				switch ($error) {
-					case self::NOTNUM:
-	   					echo '<h3 class="alert">Le champ ';
-	   					echo self::replaceFields($name, $data);
-	   					echo ' doit être numérique</h3>';
-	   					break;
-					case self::NOTMAIL:
-	   					echo '<h3 class="alert">Votre adresse mail est invalide</h3>';
-						break;
-					case self::NOTTEL:
-	   					echo '<h3 class="alert">Votre numéro de téléphone est invalide</h3>';
-	   					echo '<p class="alert">Un numéro de téléphone doit comporter dix chiffres, séparés éventuellement par des espaces.</p>';
-						break;
-					case self::NOTDATE:
-	   					echo '<h3 class="alert">Date invalide</h3>';
-	   					echo '<p class="alert">Merci de renseigner la date au format jj/mm/aaaa</p>';
-						break;
-					case self::NOTHOUR:
-	   					echo '<h3 class="alert">Heure invalide</h3>';
-	   					echo '<p class="alert">Merci de renseigner l\'heure au format HH:MM</p>';
-						break;
-					case self::NOTLINK:
-	   					echo '<h3 class="alert">Lien invalide</h3>';
-	   					echo '<p class="alert">Le lien fourni est invalide</p>';
-						break;
-	   				
-					case self::NEEDED:
-					case self::NEED1:	// true == 1
-	   					echo '<h3 class="alert">Le champ ';
-	   					echo self::replaceFields($name, $data);
-	   					echo ' est requis</h3>';
-	   					break;
-	   				case self::NEED2:
-	   				case self::NEED3:
-	   				case self::NEED4:
-	   				case self::NEED5:
-	   				case self::NEED6:
-	   				case self::NEED7:
-	   				case self::NEED8:
-	   				case self::NEED9:
-	   					echo '<h3 class="alert">Veillez renseigner au moins un des champs ';
-	   					echo self::replaceFields($name, $data);
-	   					echo '</h3>';
-	   					break;
-						
-	   				case self::CORRESPWD:
-	   					echo '<h3 class="alert">Les mots de passe ne correspondent pas</h3>';
-	   					break;
-	   				case self::EXISTS:
-	   					echo '<h3 class="alert">Le champ ';
-	   					echo self::replaceFields($name, $data);
-	   					echo ' est déjà utilisé avec cette valeur.</h3>';
-	   					break;
-	    			case self::SENDMAIL:
-	   					echo '<h3 class="alert">L\'envoi du message a échoué en raison d\'une erreur du serveur.</h3>';
-	   					include ('../Config/headers.php');
-	   					echo '<p class="centered">Merci de bien vouloir <a href="mailto:'.$emailasso.'">contacter l\'administrateur</a>.</p>';
-	   					break;
-	  					
-					case self::INSERT:
-	   					echo '<h3 class="alert">Une erreur est survenue lors de la création de ';
-	   					echo self::replaceFields(strtolower($name), $data);
-	   					echo '</span></h3>';
-	   					break;
-	   				case self::UPDATE:
-	   					echo '<h3 class="alert">Une erreur est survenue lors de la mise à jour de ';
-	   					echo self::replaceFields(strtolower($name), $data);
-	   					echo '</span></h3>';
-	   					break;
-	  					case self::DELETE:
-	   					echo '<h3 class="alert">Une erreur est survenue lors de la suppression de ';
-	   					echo self::replaceFields(strtolower($name), $data);
-	   					echo '</span></h3>';
-	   					break;
-	   					
-	   				case self::FILE:
-	   					if (FileManagement::print_errors ($Error) !== false) return true;
-	   					else break;
-	   				
-					default:
-						$Error = 	[	'name' => $name,
-										'type' => $error
-									];
-	   					if (parent::print_errors ($Error, $data) !== false) return true;
-	   					else break;
-				}
+	public static function print_errors ($Errors, $data = [], $rplmtStr = '') {
+		foreach ($Errors as $error) {
+			switch ($error) {
+				case self::NOTNUM:
+					echo '<h3 class="alert">Le champ ';
+					echo self::replaceFields($rplmtStr, $data);
+					echo ' doit être numérique</h3>';
+					break;
+				case self::NOTMAIL:
+					echo '<h3 class="alert">Votre adresse mail est invalide</h3>';
+					break;
+				case self::NOTTEL:
+					echo '<h3 class="alert">Votre numéro de téléphone est invalide</h3>';
+					echo '<p class="alert">Un numéro de téléphone doit comporter dix chiffres, séparés éventuellement par des espaces.</p>';
+					break;
+				case self::NOTDATE:
+					echo '<h3 class="alert">Date invalide</h3>';
+					echo '<p class="alert">Merci de renseigner la date au format jj/mm/aaaa</p>';
+					break;
+				case self::NOTHOUR:
+					echo '<h3 class="alert">Heure invalide</h3>';
+					echo '<p class="alert">Merci de renseigner l\'heure au format HH:MM</p>';
+					break;
+				case self::NOTLINK:
+					echo '<h3 class="alert">Lien invalide</h3>';
+					echo '<p class="alert">Le lien fourni est invalide</p>';
+					break;
+				
+				case self::NEEDED:
+				case self::NEED1:	// true == 1
+					echo '<h3 class="alert">Le champ ';
+					echo self::replaceFields($rplmtStr, $data);
+					echo ' est requis</h3>';
+					break;
+				case self::NEED2:
+				case self::NEED3:
+				case self::NEED4:
+				case self::NEED5:
+				case self::NEED6:
+				case self::NEED7:
+				case self::NEED8:
+				case self::NEED9:
+					echo '<h3 class="alert">Veillez renseigner au moins un des champs ';
+					echo self::replaceFields($rplmtStr, $data);
+					echo '</h3>';
+					break;
+					
+				case self::CORRESPWD:
+					echo '<h3 class="alert">Les mots de passe ne correspondent pas</h3>';
+					break;
+				case self::EXISTS:
+					echo '<h3 class="alert">Le champ ';
+					echo self::replaceFields($rplmtStr, $data);
+					echo ' est déjà utilisé avec cette valeur.</h3>';
+					break;
+				case self::SENDMAIL:
+					echo '<h3 class="alert">L\'envoi du message a échoué en raison d\'une erreur du serveur.</h3>';
+					include ('../Config/headers.php');
+					echo '<p class="centered">Merci de bien vouloir <a href="mailto:'.$emailasso.'">contacter l\'administrateur</a>.</p>';
+					break;
+					
+				case self::INSERT:
+					echo '<h3 class="alert">Une erreur est survenue lors de la création de ';
+					echo self::replaceFields(strtolower($rplmtStr), $data);
+					echo '</span></h3>';
+					break;
+				case self::UPDATE:
+					echo '<h3 class="alert">Une erreur est survenue lors de la mise à jour de ';
+					echo self::replaceFields(strtolower($rplmtStr), $data);
+					echo '</span></h3>';
+					break;
+					case self::DELETE:
+					echo '<h3 class="alert">Une erreur est survenue lors de la suppression de ';
+					echo self::replaceFields(strtolower($rplmtStr), $data);
+					echo '</span></h3>';
+					break;
+					
+				case self::FILE:
+					if (FileHandling::print_errors ([$error], $data, $rpltStr) !== false) return true;
+					else break;
+				
+				default:
+					if (parent::print_errors ($error, $data, $rplmtStr) !== false) return true;
+					else break;
 			}
 		}
 		
@@ -326,10 +321,9 @@ abstract class MysqlTable implements Table
 
 	// GETTERS
 	public function print_errors() {
-		foreach ($this->Fields as $content) {
-			if (SQL_ERR::print_errors ([ $content->Name => $content->Errors ], $this->get_data($this->idLoad) !== false))
-				return true;
-		}
+		$data = $this->get_data ($this->idLoad);
+		foreach ($this->Fields as $content)
+			SQL_ERR::print_errors ($content->Errors, $data, $content->Name);
 		
 		return false;
 	}
@@ -730,7 +724,6 @@ abstract class MysqlTable implements Table
 		if (!array_key_exists($field, $this->Fields)) return SQL_ERR::KO;
 		
 		if ($this->Fields[$field]->Unique && !$this->isUnique($field, $value)) return SQL_ERR::EXISTS;
-
 		switch ($this->Fields[$field]->Type) {
 			case TYPE::ID:
 				return ($this->is_data($value) ? SQL_ERR::OK : SQL_ERR::UNKNOWN);
@@ -772,8 +765,8 @@ abstract class MysqlTable implements Table
 			if (!array_key_exists($field, $this->Fields)) continue;
 			
 			// search errors
-			$err = (($this->Fields[$field]-> Type == TYPE::FILE || $this->Field[$field]->Type == TYPE::PRELOAD || $value != "") ? $this->isValidValue($field, $value) : SQL_ERR::OK);
-			if ($err && ($this->Fields[$field]->Type != TYPE::ID || $value > 0))
+			$err = ($value != "" ? $this->isValidValue($field, $value) : SQL_ERR::OK);
+			if ($err && ($this->Fields[$field]->Type != TYPE::ID || $value > 0) && ($this->Fields[$field]->Type != TYPE::PRELOAD || $value != ''))
 				array_push($this->Fields[$field]->Errors, $err);
 			
 			$nbErrors = sizeof($this->Fields[$field]->Errors);
@@ -788,20 +781,12 @@ abstract class MysqlTable implements Table
 								array_push($this->Fields[$field]->Errors, SQL_ERR::NEEDED);
 							break;
 						case TYPE::FILE:
-							if ($nbErrors > 0) {
-								if ($nbErrors > 1 || $this->Fields[$field]->Errors[0] != FILE_ERR::NOFILE) {
-									array_push ($this->Fields[$field]->Errors, SQL_ER::NEEDED);
-									break;
-								}
-								// preload errors are ever set as it have been unshifted in front of Fields array
-								$preload = $this->Fields[Mysql::getPreloadFileName($field)];
-								if (sizeof($preload->Errors) > 0)
-									array_push ($this->Fields[$field]->Errors, SQL_ERR::NEEDED);							
-							}
-							break;
+							if ($nbErrors > 0)
+								array_push ($this->Fields[$field]->Errors, SQL_ER::NEEDED);
+						case TYPE::PRELOAD: break;
 							
 						default:
-							if ($value == "" || $nbErr > 0)
+							if ($value == "" || $nbErrors > 0)
 								array_push($this->Fields[$field]->Errors, SQL_ERR::NEEDED);
 							break;
 					}
@@ -814,7 +799,6 @@ abstract class MysqlTable implements Table
 							case TYPE::NUM:
 								$isSet[$numId] = ($value > 0 && $nbErrors == 0); break;
 							case TYPE::FILE:
-							case TYPE::PRELOAD:
 								$isSet[$numId] = ($nbErrors == 0); break;
 							default:
 								$isSet[$numId] = ($value != "" && $nbErrors == 0); break;
@@ -850,16 +834,15 @@ abstract class MysqlTable implements Table
 					break;
 				
 				case TYPE::PRELOAD:
-					if ($nbErrors == 0) $validValues[$field] = $value;
-					else array_splice_by_key ($this->Fields, $field, 1);
-					break;
+					if ($nbErrors == 0 && $value != '') $validValues[$field] = $value;
+					else $validValues[$field] = '';
+					break; // and wait for checking matching file
 				case TYPE::FILE:
-					if ($nbErrors == 0) {
-						// unset preload
-						array_splice_by_key ($this->Fields, $field, 1);
+					if ($nbErrors == 0 && $this->Fields[$field]->type != NULL) {
 						$validValues[$field] = $value['tmp_name'];
+						// unset preload
+						array_splice_by_key ($this->Fields, UI_MysqlTable::preloadFileName($field), 1);
 					}
-					else $value = $this->Defaults[$field];
 					break;
 
 				default:
@@ -1002,10 +985,13 @@ abstract class MysqlTable implements Table
 		}*/
 		
 		if ($type == TYPE::FILE || $type == TYPE::PRELOAD) {
-			$value = $this->Fields[$field]->upload($this->Table, $field);
+			if ($type == TYPE::PRELOAD && $value != '') {
+				$fileField = UI_MysqlTable::removePreloadFileName($field);
+				$value = $this->Fields[$fileField]->upload($this->Table, $field);
+			}
+			else $value = $this->Fields[$field]->upload($this->Table, $field);
 			if (!$value) return false;
-			if ($type == TYPE::PRELOAD)
-				$field = UI_MyqslTable::removePreloadFileName ($field);	
+			if ($type == TYPE::PRELOAD) $field = $fileField;
 		}
 		
 		$reponse = $this->bdd->prepare('UPDATE '.$this->Table.' SET '.$field.' = :value WHERE id = :id');
@@ -1033,7 +1019,8 @@ abstract class MysqlTable implements Table
 			array_push ($this->Fields['id']->Errors, SQL_ERR::ACCESS);
 			return false;
 		}
-
+		print_r($fields);
+			
 		$echoValues = [];
 		foreach ($fields as $field => $value) {
 			$type = $this->Fields[$field]->Type;
@@ -1046,10 +1033,13 @@ abstract class MysqlTable implements Table
 				return false;
 			}*/
 			if ($type == TYPE::FILE || $type == TYPE::PRELOAD) {
-				$value = $this->Fields[$field]->upload($this->Table, $field);
+				if ($type == TYPE::PRELOAD && $value != '') {
+					$fileField = UI_MysqlTable::removePreloadFileName($field);
+					$value = $this->Fields[$fileField]->upload($this->Table, $field);
+				}
+				else $value = $this->Fields[$field]->upload($this->Table, $field);
 				if (!$value) return false;
-				if ($type == TYPE::PRELOAD)
-					$field = UI_MyqslTable::removePreloadFileName ($field);	
+				if ($type == TYPE::PRELOAD) $field = $fileField;
 			}
 		
 			$echoValues[$field] = ':'.strtolower($field);
@@ -1057,8 +1047,7 @@ abstract class MysqlTable implements Table
 		
 		$fullFields = implode(', ', array_keys($fields));
 		$fullValues = implode(', ', $echoValues);
-		echo $req;
-		$reponse = $this->bdd->prepare($req);
+		$reponse = $this->bdd->prepare ('INSERT INTO '.$this->Table.' ('.$fullFields.') VALUES ('.$fullValues.')');
 
 		foreach ($fields as $field => $value) {
 			switch ($this->Fields[$field]->Type) {
@@ -1139,8 +1128,7 @@ abstract class MysqlTable implements Table
 			
 			case TYPE::COLOR:
 				return preg_replace('#\s#', '', UI_MysqlTable::secureText($data));
-			case TYPE::MAIL:
-				return str_replace('@', ' [AT] ', UI_MysqlTable::secureText($data));
+			case TYPE::FILE: break;	// files' $value is an array [ 'tmp_name', 'name', 'error', etc ]
 				
 			default:
 				return UI_MysqlTable::secureText($data);
@@ -1170,7 +1158,7 @@ abstract class MysqlTable implements Table
 			case TYPE::HOUR: return $this->formatTime($data);
 			case TYPE::BOOL: return ($data ? 1 : 0);
 			case TYPE::COLOR: return $this->removeSpaces($data);
-			default: return $data;	
+			default: return $data;
 		}
 	}
 	
@@ -1232,7 +1220,7 @@ abstract class UI_MysqlTable implements UI_Table
 		}
 	}
 	protected static function afficheMail($mail) {
-		return str_replace (' [AT] ', '@', $mail);
+		return str_replace (' @ ', ' [AT] ', $mail);
 	}
 	
 	// SPECIFICS

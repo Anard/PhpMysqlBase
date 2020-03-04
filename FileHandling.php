@@ -2,6 +2,7 @@
 require_once ('Field.php');
 
 interface FileInterface {
+	public function print_errors();
 	// Get current File object
 	public function getFileInfo ();
 	// Preload file in tmp dir (acces via JS)
@@ -24,36 +25,33 @@ class FILE_ERR extends ERR {
 	const UPLOAD =	110;
 	
 	// Print errors
-	public static function print_errors ($Error, $data = [	'path' => "",
-															'size' => "",
-															'type' => ""
-										])
+	public static function print_errors ($Errors, $data = [], $rplmtStr = '') // $$data is from getFileInfo()
 	{
-		switch ($Error) {
-			case self::NOFILE:
-				echo '<h3 class="alert">Le fichier ';
-				self::replaceFields ('__path|choisi__', $data);
-				echo ' est introuvable.</h3>';
-				break;
-			case self::SIZE:
-				'<h3 class="alert">Votre fichier est trop volumineux</h3>';
-				'<p class="alert">Merci de respecter la limite des '.($data['size'] / 1000000).'Mo par fichier.</p>';
-				break;
-			case self::TYPE:
-				'<h3 class="alert">Votre fichier est de type incorrect</h3>';
-				'<p class="alert">Merci de choisir un fichier parmi les formats supportés : '.$data['type'].'</p>';
-				break;
-			case self::UPLOAD:
-				$message = '<h3 class="alert">Un erreur est survenue pendant le téléchargement de votre fichier</h3>';
-				break;
-			
-			default:			
-				$Error = 	[	'name' => 'image',
-								'type' => $Error
-							];
-				return (parent::print_errors ($Error, $data) !== false);
+		// $Errors contient toutes les erreurs du champ
+		foreach ($Errors as $error) {
+			switch ($error) {
+				case self::NOFILE:
+					echo '<h3 class="alert">Le fichier ';
+					self::replaceFields ('__path|choisi__', $data);
+					echo ' est introuvable.</h3>';
+					break;
+				case self::SIZE:
+					echo '<h3 class="alert">Votre fichier est trop volumineux</h3>';
+					echo '<p class="alert">Merci de respecter la limite des '.($data['size'] / 1000000).'Mo par fichier.</p>';
+					break;
+				case self::TYPE:
+					echo '<h3 class="alert">Votre fichier est de type incorrect</h3>';
+					echo '<p class="alert">Merci de choisir un fichier parmi les formats supportés : '.$data['type'].'</p>';
+					break;
+				case self::UPLOAD:
+					echo '<h3 class="alert">Un erreur est survenue pendant le téléchargement de votre fichier</h3>';
+					echo '<p class="alert">Merci de bien vouloir réessayer plus tard.</p>';
+					break;
+				
+				default:
+					return (parent::print_errors ($error, $data) !== false);
+			}
 		}
-		
 		return false;
 	}
 }
@@ -67,7 +65,7 @@ class FILE_TYPE extends ExtdEnum {
 	const PDF = ['pdf'];
 }
 
-class HANDLERS extends ExtdEnum {
+/*class HANDLERS extends ExtdEnum {
 	// const NAME is exif's output (const returned by exif_imagetype for images)
 	const __default = NULL;
 	
@@ -91,7 +89,7 @@ class HANDLERS extends ExtdEnum {
 		    'save' => 'imagegif',
 		    'header' => 'image/gif'
 		];
-}
+}*/
 
 class File extends Field implements FileInterface {
 
@@ -109,12 +107,28 @@ class File extends Field implements FileInterface {
 	// Fichiers temporaires considérés trop vieux
 	const DELAY_OLDFILE = 1800; // 1800s = 30min
 	
+	const HANDLERS = [	IMAGETYPE_JPEG => [	'type' => FILE_TYPE::JPG,
+											'load' => 'imagecreatefromjpeg',
+											'save' => 'imagejpeg',
+											'quality' => 96,
+											'header' => 'image/jpeg'],
+						IMAGETYPE_PNG => [	'type' => FILE_TYPE::PNG,
+											'load' => 'imagecreatefrompng',
+											'save' => 'imagepng',
+											'quality' => 0,
+											'header' => 'image/png'],
+						IMAGETYPE_GIF => [	'type' => FILE_TYPE::GIF,
+											'load' => 'imagecreatefromgif',
+											'save' => 'imagegif',
+											'header' => 'image/gif']
+	];
+
+	
 	// Properties
 	public $Types = [ FILE_TYPE::__default ];
 	public $MaxSize;	// Taille max des fichiers
-	
+	public $type = FILE_TYPE::__default;
 	private $path;
-	private $type = FILE_TYPE::__default;
 	
 	// Construct : list of supported types, maxSize (Mo)
 	function __construct ($name = '', $okTypes = [], $maxSize, $required = false, $unique = false) {
@@ -135,6 +149,11 @@ class File extends Field implements FileInterface {
 	
 	// ------- Interface Methods ---------
 	// PUBLIC	
+	public function print_errors() {
+		foreach ($this->Errors as &$Error)
+			FILE_ERR::print_errors($this->Errors, $data);
+	}
+	
 	// Getters
 	public function getFileInfo ($path = '') {
 		if ($path == '') $path = $this->path;
@@ -154,9 +173,14 @@ class File extends Field implements FileInterface {
 	// Setters
 	// Preload POST file in tmp dir (updload via JS)
 	public function preload ($field) {
-		$err = $this->validateFileData ($_FILES[$field]['tmp_name'], $this->Types);
-		if ($err) FILE_ERR::print_errors( [ $err ], getFileInfo($_FILES[$field]['tmp_name']));
-		else echo self::PATH_UPLOAD['tmp'].$this->upload('tmp', $field);
+		$err = $this->validateFileData ($_FILES[$field]['tmp_name']);
+		if ($err) FILE_ERR::print_errors([ $err ], $this->getFileInfo($_FILES[$field]['tmp_name']));
+        else {
+            $tmpFileName = $this->upload('tmp', $field);
+            if (!$tmpFileName)
+                FILE_ERR::print_errors ($this->Errors, $this->getFileInfo($_FILES[$field]['tmp_name']));
+            else echo self::PATH_UPLOAD['tmp'].$tmpFileName;
+        }
 	}
 	
 	// Upload file, nom is a prefix
@@ -165,7 +189,7 @@ class File extends Field implements FileInterface {
 	
 		if (!array_key_exists($table, self::PATH_UPLOAD)) {
 			array_push ($this->Errors, FILE_ERR::KO);
-			return false;
+			return NULL;
 		}
 		// image déjà uploadée par JS
 		if ($this->Type == TYPE::PRELOAD) {
@@ -186,23 +210,24 @@ class File extends Field implements FileInterface {
 		
 		if ($move) return $nom;
 		array_push ($this->Errors, FILE_ERR_UPLOAD);
-		return false;
+		return NULL;
 	}
 
 	// Validate POST field
 	public function validatePostedFile ($field) {
 		// Contrôles préalables (erreurs PHP)
-		if (!isset($_FILES[$field])) return false;
+		if (!isset($_FILES[$field])) return FILE_ERR::KO;
 
 		if ($_FILES[$field]['error'] > 0) {
 			switch ($_FILES[$field]['error']) {
-				case UPLOAD_ERR_NO_FILE:
-					array_push ($this->Errors, FILE_ERR::NOFILE); return false;
 				case UPLOAD_ERR_INI_SIZE:
-				case UPLOAD_ERR_FORM_SIZE:
-					array_push ($this->Errors, FILE_ERR::SIZE); return false;
-				case UPLOAD_ERR_PARTIAL:
-					array_push ($this->Errors, FILE_ERR::UPLOAD); return false;
+				case UPLOAD_ERR_FORM_SIZE:	return FILE_ERR::SIZE;
+				case UPLOAD_ERR_PARTIAL:	return FILE_ERR::UPLOAD;
+				case UPLOAD_ERR_NO_FILE:
+					$this->src = ''; $this->type = FILE_TYPE::__default;
+					return FILE_ERR::OK;	// on ne bloque pas s'il n'y a pas de fichier, mais on retourrne des valeurs nulles
+				default:					return FILE_ERR::KO;
+			
 			}
 		}
 		
@@ -212,12 +237,10 @@ class File extends Field implements FileInterface {
 	// PRIVATE
 	// Validate file source and save data
 	private function validateFileData ($src) {
-		if (!file_exists($src)) {
-			array_push ($this->Errors, FILE_ERR::NOFILE);
-			return false;
-		}
+		if (!file_exists($src)) return FILE_ERR::NOFILE;
+
 		// get handlers
-		$testedImage = false;
+		$imageHandlers = false;
 		$handlers = NULL;
 		
 		foreach ($this->Types as $type) {
@@ -227,8 +250,9 @@ class File extends Field implements FileInterface {
 				case FILE_TYPE::PNG:
 				case FILE_TYPE::GIF:
 					// handlers remain null il key doesn't exist
-					if (!$testedImage) $handlers = HANDLERS::getKey(exif_imagetype($src));
-					$testedImage = true;
+                    if (!$imageHandlers)  $imageHandlers = exif_imagetype($src);
+					if (array_key_exists($imageHandlers, self::HANDLERS) && self::HANDLERS[$imageHandlers]['type'] == $type)
+						$handlers = self::HANDLERS[$imageHandlers];
 					break;
 					
 				case FILE_TYPE::PDF:
@@ -236,14 +260,11 @@ class File extends Field implements FileInterface {
 					$handlers = NULL;
 					break;
 			}
-			if ($handlers != NULL) break;
+			if ($handlers) break;
 		}
 
-		if ($handlers == NULL) {
-			array_push ($this->Errors, FILE_ERR::TYPE);
-			return false;
-		}
-
+		if (!$handlers) return FILE_ERR::TYPE;
+				
 		$this->src = $src;
 		$this->type = $handlers;
 		
@@ -419,11 +440,11 @@ class UI_File implements UI_FileInterface {
 	// Methods
 	public static function draw_fieldset ($field, $table, $maxSize, $image = "") {
 		if (!is_numeric($maxSize)) return false;
-		if (!file_exists($image) || is_dir($image)) $image = "";
+		if (!file_exists($image) || !is_file($image)) $image = "";
 		
-		echo '<p>Vous pouvez choisir une image (jpg, png, gif) pour illustrer la page (maximum '.$maxSize.'Mo).</p>';
-		echo '<input type="hidden" name="MAX_FILE_SIZE" value="'.($maxSize * 1000000).'" />';
 		echo '<div class="container">';
+			echo '<p>Vous pouvez choisir une image (jpg, png, gif) pour illustrer la page (maximum '.$maxSize.'Mo).</p>';
+			echo '<input type="hidden" name="MAX_FILE_SIZE" value="'.($maxSize * 1000000).'" />';
 			echo '<img id="imageupload" ';
 			if ($image != "") echo 'style="display: block;" ';
 			echo 'src="'.$image.'" alt="" />';

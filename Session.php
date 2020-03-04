@@ -11,7 +11,8 @@ class SESS_ERR extends ERR {
 	const COOKIE =	21;
 	
 	// Print errors
-	public static function print_errors ($Errors, $data = []) {
+	public static function print_errors ($Errors, $data = [], $rplmtStr = 'Utilisateur') {
+		// Errors contiennt toutes les erreurs de session
 		foreach ($Errors as $error) {
 			switch ($error) {
 				case self::LOGIN:
@@ -34,14 +35,10 @@ class SESS_ERR extends ERR {
 					break;
 					
 				default:
-					$Error = 	[	'name' => 'Utilisateur',
-									'type' => $error
-								];
-   					if (parent::print_errors ($Error, $data) !== false) return true;
+   					if (parent::print_errors ($error, $data, $rplmtStr) !== false) return true;
    					else break;
 			}
 		}
-		
 		return false;
 	}
 }
@@ -191,8 +188,7 @@ final class SessionManagement implements Session
 		}
 	}
 
-	// Public
-	// Return errors
+	// PUBLIC
 	public function print_errors() {
 		return SESS_ERR::print_errors($this->Errors);
 	}
