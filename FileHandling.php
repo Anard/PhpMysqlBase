@@ -29,8 +29,7 @@ class FILE_ERR extends ERR {
 															'type' => ""
 										])
 	{
-
-		switch ($error) {
+		switch ($Error) {
 			case self::NOFILE:
 				echo '<h3 class="alert">Le fichier ';
 				self::replaceFields ('__path|choisi__', $data);
@@ -50,7 +49,7 @@ class FILE_ERR extends ERR {
 			
 			default:			
 				$Error = 	[	'name' => 'image',
-								'type' => $error
+								'type' => $Error
 							];
 				return (parent::print_errors ($Error, $data) !== false);
 		}
@@ -126,7 +125,9 @@ class File extends Field implements FileInterface {
 				array_push ($this->Types, $type);
     		}
     	}
-    	if (sizeof ($this->Types) == 0) return FILE_ERR::KO;		
+    	if (sizeof ($this->Types) == 1) return FILE_ERR::KO;
+    	// delete FILE_TYPE::__default value
+    	else array_shift($this->Types); 				
 		
 		
 		if (!parent::__construct(TYPE::FILE, $name, $required, $unique)) return NULL;
@@ -136,12 +137,13 @@ class File extends Field implements FileInterface {
 	// PUBLIC	
 	// Getters
 	public function getFileInfo ($path = '') {
-		if ($path == '')
-			$path = substr ($this->path, strripos ('/', $this->path) + 1);
-		foreach ($data['type'] as $types)
+		if ($path == '') $path = $this->path;
+		$path = substr ($this->path, strripos ($path, '/') + 1);
+
+		foreach ($this->Types as $types)
 			$arrayTypes[] = implode (', ', $types);
 		$type = implode (', ', $arrayTypes);
-		$size = $this->Size;
+		$size = $this->MaxSize;
 		
 		return array (	'path' => $path,
 						'type' => $type,
@@ -166,7 +168,7 @@ class File extends Field implements FileInterface {
 			return false;
 		}
 		// image déjà uploadée par JS
-		if ($field->Type == TYPE::PRELOAD) {
+		if ($this->Type == TYPE::PRELOAD) {
 			$file = array (
 				'name'		=> preg_replace ('#((.*)\/)+([0-9]+\.[A-Za-z]{3,4})$#', '$3', $value),
 				'tmp_name'	=> $value
@@ -179,7 +181,7 @@ class File extends Field implements FileInterface {
 		$extension = strtolower(substr(strrchr($file['name'], '.'), 1));
 		$nom = $table.time().'.'.$extension;
 		
-		if ($field->Type == TYPE::PRELOAD) $move = rename($file['tmp_name'], $path.$nom);
+		if ($this->Type == TYPE::PRELOAD) $move = rename($file['tmp_name'], $path.$nom);
 		else $move = move_uploaded_file($file['tmp_name'], $path.$nom);
 		
 		if ($move) return $nom;
@@ -417,7 +419,7 @@ class UI_File implements UI_FileInterface {
 	// Methods
 	public static function draw_fieldset ($field, $table, $maxSize, $image = "") {
 		if (!is_numeric($maxSize)) return false;
-		if (!file_exists($image)) $image = "";
+		if (!file_exists($image) || is_dir($image)) $image = "";
 		
 		echo '<p>Vous pouvez choisir une image (jpg, png, gif) pour illustrer la page (maximum '.$maxSize.'Mo).</p>';
 		echo '<input type="hidden" name="MAX_FILE_SIZE" value="'.($maxSize * 1000000).'" />';
