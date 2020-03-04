@@ -14,6 +14,49 @@ function array_splice_by_key (&$array, $key, $length='ALL', $replacement=array()
 require_once ('Session.php');
 require_once ('FileHandling.php');
 
+// ----------- GLOBAL Table INTERFACE to implement in child classes ------------
+interface Table {
+	// Set defaults and table
+	// Retourne SQL_ERR::RIGHTS si on n'a pas les droits sur l'idLoad
+	function __construct();
+	
+	// STATIC (UI)
+	public static function randomColor();
+
+	// GETTERS
+	public function print_errors();
+	// Get table short name
+	public function getTableName();
+	// Get defaults
+	public function getDefaults($field = GET::ALL);
+	// Get current ID
+	public function getIdLoad();
+	// Return true if default access is write access
+	public function isAdmin();
+	// Check if authorized
+	public function rights_control ($read_write = NULL, $id = 0, $userid = 0);
+	// Search if data exists from DB
+	public function is_data ($id = 0);
+	// Return data array from DB, $read_write n'est utilisé que pour GET::LIST pour obtenir la list des entréees autorisées
+	public function get_data ($get = GET::__default, $fields = GET::ALL, $read_write = NULL);
+	
+	// Admin list
+	// Check if authorised on multiple entries
+	public function need_list ();
+	
+	// SETTERS
+	public function send_form (); // values are from form's POST variables
+}
+
+// UI for Table CLASS
+interface UI_Table {
+	// Draw specific form's fieldset (innerHTML, could be a div or anything else)
+	public static function draw_fieldset ($action, $data, $table);
+	
+	// Draw admin list
+	public static function draw_list ($list, $deploy = true, $deleteButtons = false);
+}
+
 // ERRORS
 class SQL_ERR extends ERR {
 	const INVALID =	-1;	// generic invalid (should not happen as normally ever checked (see update & insert on isValidField))
@@ -42,6 +85,7 @@ class SQL_ERR extends ERR {
 	const CORRESPWD =	30;
 	const EXISTS =		31;
 	const SENDMAIL =	32;
+	const FILE =		33;
 	
 	// updating BDD
 	const INSERT =	40;
@@ -128,10 +172,7 @@ class SQL_ERR extends ERR {
 	   					break;
 	   					
 	   				case self::FILE:
-						$Error = 	[	'name' => $name,
-										'type' => $error
-									];
-	   					if (FileManagement::print_errors ($Error, $data) !== false) return true;
+	   					if (FileManagement::print_errors ($Error) !== false) return true;
 	   					else break;
 	   				
 					default:
@@ -150,28 +191,6 @@ class SQL_ERR extends ERR {
 
 
 // ENUMS
-// Mysql data types
-class TYPE extends ExtdEnum
-{
-	const __default = self::NONE;
-	const NONE =	-1;
-	const ID =		0;
-	const PARENT =	1;
-	const NUM =		2;
-	const BOOL =	3;
-	const TEXT =	4;
-	
-	const MAIL =	10;
-	const TEL =		11;
-	const DATE =	12;
-	const HOUR =	13;
-	
-	const COLOR =	20;
-	const LINK =	21;
-	const PASSWD =	22;
-	
-	const FILE =	30;
-}
 // Rights on tables
 class AUTHORISED extends ExtdEnum
 {
@@ -209,72 +228,6 @@ class GET extends ExtdEnum {
 	const LIST =	-1;
 }
 
-// Fields
-class Field
-{
-	public $Type = TYPE::__default;
-	public $Name = ''; // nom qui apparaîtra dans les erreurs
-	public $Required = false;	// true, false or number if one of corresponding number is required
-	public $Unique = false;
-	public $Errors = array();
-	
-	function __construct ($type = TYPE::__default, $name = '', $required = false, $unique = false) {
-		if (is_bool($required) || is_numeric($required))
-			$this->Required = $required;
-		else return false;
-		if (is_bool($unique))
-			$this->Unique = $unique;
-		else return false;
-		$this->Type = TYPE::getKey($type);
-		$this->Name = $name;
-		
-		return true;
-	}
-}
-
-// ----------- GLOBAL Table INTERFACE to implement in child classes ------------
-interface Table {
-	// Set defaults and table
-	// Retourne SQL_ERR::RIGHTS si on n'a pas les droits sur l'idLoad
-	function __construct();
-	
-	//  Static methods
-	public static function randomColor();
-	
-	// GETTERS
-	public function print_errors();
-	// Get table short name
-	public function getTableName();
-	// Get defaults
-	public function getDefaults($field = GET::ALL);
-	// Get current ID
-	public function getIdLoad();
-	// Return true if default access is write access
-	public function isAdmin();
-	// Check if authorized
-	public function rights_control ($read_write = NULL, $id = 0, $userid = 0);
-	// Search if data exists from DB
-	public function is_data ($id = 0);
-	// Return data array from DB, $read_write n'est utilisé que pour GET::LIST pour obtenir la list des entréees autorisées
-	public function get_data ($get = GET::__default, $fields = GET::ALL, $read_write = NULL);
-	
-	// Admin list
-	// Check if authorised on multiple entries
-	public function need_list ();
-	
-	// SETTERS
-	public function send_form (); // values are from form's POST variables
-}
-
-// UI interface
-interface UI_Table {
-	// Draw specific form's fieldset (innerHTML, could be a div or anything else)
-	public static function draw_fieldset ($action, $data, $table);
-	
-	// Draw admin list
-	public static function draw_list ($list, $deploy = true, $deleteButtons = false);
-}
-
 // ---------- GLOBAL BASE CLASS ------------
 abstract class MysqlTable implements Table
 {
@@ -285,7 +238,7 @@ abstract class MysqlTable implements Table
 	protected $Table;				// name of Mysql base table with prefix
 	protected $Parent = NULL;		// Parent de la classe finalle éventuel
 	protected $parentItem; 			// nom de l'id du parent dans la BDD
-	protected $Children = array(); 	// Enfants de la classe finalle éventuels
+	protected $childsTables = array(); 	// Enfants de la classe finalle éventuels
 	protected $rights = [	ACCESS::READ => AUTHORISED::__default,
 							ACCESS::WRITE => AUTHORISED::__default
 						];			// Droits
@@ -297,9 +250,8 @@ abstract class MysqlTable implements Table
 	protected $table;				// name of Mysql base table
 	protected $idLoad;				// Page loaded id
 	protected $Defaults;			// defaults fields values
-	private $Ordering;				// default ordering of data
+	private	$Ordering;				// default ordering of data
 	private $Limiting;				// default exclusion when getting data
-	
 	
 	// Constructor => inherit : lien vers la table héritée)
 	function _constructInit ($table, $childsTables = [], $ordering = "", $limiting = "") {
@@ -338,7 +290,13 @@ abstract class MysqlTable implements Table
 		$this->idLoad = $this->Defaults['id'];
 		foreach ($this->Fields as $field => $content) {
 			switch ($content->Type) {
-				case TYPE::PARENT: $this->parentItem = $field; break;
+				// set parent item
+				case TYPE::PARENT:	$this->parentItem = $field; break;
+				// add preloader field
+				// have to be plced before, so checked first when validating
+				case TYPE::FILE:
+					$preload = new Field (TYPE::PRELOAD, $this->Fields[$field]->Name);
+					$this->Fields = array( UI_MysqlTable::preloadFileName($field) => $preload )+$this->Fields;
 				default: break;
 			}
 		}
@@ -353,7 +311,8 @@ abstract class MysqlTable implements Table
 		$this->bdd = NULL;
 	}
 	
-	// Static methods
+	// ------------ GLOBAL INTERFACE METHODS ----------- //
+	// STATIC
 	public static function randomColor() {
 		$color = "";
 		$characters = array(0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 'a', 'b', 'c', 'd', 'e', 'f');
@@ -365,8 +324,6 @@ abstract class MysqlTable implements Table
 		return '#'.$color;
 	}
 
-	
-	// ------------ Default Table methods ---------------
 	// GETTERS
 	public function print_errors() {
 		foreach ($this->Fields as $content) {
@@ -719,17 +676,19 @@ abstract class MysqlTable implements Table
 	
 	// SETTERS		
 	// only final function is public (need at least to check 'action' first)
-	protected function _send_form ($postedValues) {
+	protected function _send_form () {
 		// record settings
 		SessionManagement::updateCookies();
 		
 		// prepare data
+		$postedValues = array_merge ($_POST, $_FILES);
+		
 		$validatedValues = $this->_validate_posted_data($this->secure_data($postedValues));
 		// post
 		return $this->_record_changes ($validatedValues);
 	}
 	
-	// ----------- Internal Methods ------------
+	// ----------- INTERNAL METHODS ------------
 	// GETTERS
 	// Get Order defaults
 	protected function getOrdering() {
@@ -778,6 +737,7 @@ abstract class MysqlTable implements Table
 			case TYPE::PARENT:
 				return ($this->Parent->is_data($value) ? SQL_ERR::OK : SQL_ERR::UNKNOWN);				
 			case TYPE::NUM:		return (is_numeric($value) ? SQL_ERR::OK : SQL_ERR::NOTNUM);
+			
 			case TYPE::MAIL:	return (filter_var($value, FILTER_VALIDATE_EMAIL) ? SQL_ERR::OK : SQL_ERR::NOTMAIL);
 			case TYPE::TEL:		return ((preg_match ('#^[0-9]{10}$#', preg_replace ('#\s#', '', $value)) == 1) ? SQL_ERR::OK : SQL_ERR::NOTTEL);
 			case TYPE::DATE: //return ((preg_match ('#^[0-9]{2,4}-[0-9]{2}-[0-9]{2}$#', $value) == 1) ? SQL_ERR::OK : SQL_ERR::DATE);
@@ -786,6 +746,8 @@ abstract class MysqlTable implements Table
 			case TYPE::LINK:	return (filter_var($value, FILTER_VALIDATE_URL) ? SQL_ERR::OK : SQL_ERR::NOTLINK);
 			case TYPE::COLOR:	return ((preg_match ('/^(#[0-9a-fA-F]{6})|(rgb\((\s*[01]?[0-9]?[0-9]|2[0-4][0-9]|25[0-5]\s*,){2}\s*[01]?[0-9]?[0-9]|2[0-4][0-9]|25[0-5]\s*\))$/',$value) == 1) ? SQL_ERR::OK : SQL_ERR::NOTCOLOR);
 			
+			case TYPE::FILE:	return $this->Fields[$field]->validatePostedFile ($field);
+			case TYPE::PRELOAD;	return (file_exists($value)) ? SQL_ERR::OK : SQL_ERR::FILE;
 			default:			return SQL_ERR::OK;
 		}
 	}
@@ -803,27 +765,18 @@ abstract class MysqlTable implements Table
 				else return $this->Fields[$field]->Required;
 		}
 	}
-			
-	// SETTERS
-	// Définition des types
-	protected function set_field ($field, $type, $name = '', $required = false, $unique = false) {
-		if (!array_key_exists($field, $this->Fields)) return false;
-
-		if ($type == TYPE::ID || $type == TYPE::PARENT) $required = true;
-		
-		return ($this->Fields[$field] = new Field($type, $name, $required, $unique));
-	}
-
+	
 	// Validate posted data and push errors
 	protected function _validate_posted_data ($postedValues) {
 		foreach ($postedValues as $field => $value) {
 			if (!array_key_exists($field, $this->Fields)) continue;
 			
 			// search errors
-			$err = (($value != "") ? $this->isValidValue($field, $value) : SQL_ERR::OK);
+			$err = (($this->Fields[$field]-> Type == TYPE::FILE || $this->Field[$field]->Type == TYPE::PRELOAD || $value != "") ? $this->isValidValue($field, $value) : SQL_ERR::OK);
 			if ($err && ($this->Fields[$field]->Type != TYPE::ID || $value > 0))
 				array_push($this->Fields[$field]->Errors, $err);
 			
+			$nbErrors = sizeof($this->Fields[$field]->Errors);
 			// is required and set without error ?
 			switch ($this->Fields[$field]->Required) {
 				case false: break;
@@ -831,11 +784,24 @@ abstract class MysqlTable implements Table
 					switch ($this->Fields[$field]->Type) {
 						case TYPE::ID: case TYPE::PARENT: break;
 						case TYPE::NUM:
-							if ($value == 0 || sizeof($this->Fields[$field]->Errors) > 0)
+							if ($value == 0 || $nbErrors > 0)
 								array_push($this->Fields[$field]->Errors, SQL_ERR::NEEDED);
 							break;
+						case TYPE::FILE:
+							if ($nbErrors > 0) {
+								if ($nbErrors > 1 || $this->Fields[$field]->Errors[0] != FILE_ERR::NOFILE) {
+									array_push ($this->Fields[$field]->Errors, SQL_ER::NEEDED);
+									break;
+								}
+								// preload errors are ever set as it have been unshifted in front of Fields array
+								$preload = $this->Fields[Mysql::getPreloadFileName($field)];
+								if (sizeof($preload->Errors) > 0)
+									array_push ($this->Fields[$field]->Errors, SQL_ERR::NEEDED);							
+							}
+							break;
+							
 						default:
-							if ($value == "" || sizeof($this->Fields[$field]->Errors) > 0)
+							if ($value == "" || $nbErr > 0)
 								array_push($this->Fields[$field]->Errors, SQL_ERR::NEEDED);
 							break;
 					}
@@ -846,9 +812,12 @@ abstract class MysqlTable implements Table
 					else {
 						switch ($this->Fields[$field]->Type) {
 							case TYPE::NUM:
-								$isSet[$numId] = ($value > 0 && !isset($this->Fields[$field]->Errors)); break;
+								$isSet[$numId] = ($value > 0 && $nbErrors == 0); break;
+							case TYPE::FILE:
+							case TYPE::PRELOAD:
+								$isSet[$numId] = ($nbErrors == 0); break;
 							default:
-								$isSet[$numId] = ($value != "" && !isset($this->Fields[$field]->Errors)); break;
+								$isSet[$numId] = ($value != "" && $nbErrors == 0); break;
 						}
 					}
 					break;
@@ -879,7 +848,20 @@ abstract class MysqlTable implements Table
 						$validValues[$field] = $this->Defaults[$field];
 					else $validValues[$field] = password_hash ($value, PASSWORD_DEFAULT);
 					break;
-								
+				
+				case TYPE::PRELOAD:
+					if ($nbErrors == 0) $validValues[$field] = $value;
+					else array_splice_by_key ($this->Fields, $field, 1);
+					break;
+				case TYPE::FILE:
+					if ($nbErrors == 0) {
+						// unset preload
+						array_splice_by_key ($this->Fields, $field, 1);
+						$validValues[$field] = $value['tmp_name'];
+					}
+					else $value = $this->Defaults[$field];
+					break;
+
 				default:
 					if ($nbErrors > 0 && ($nbErrors > 1 || $this->Fields[$field]->Errors[0] != SQL_ERR::NEEDED))
 						$validValues[$field] = $this->Defaults[$field];
@@ -891,12 +873,23 @@ abstract class MysqlTable implements Table
 		return $validValues;
 	}
 	
+	// SETTERS
+	// Définition des types
+	protected function set_field ($field, $type, $name = '', $required = false, $unique = false) {
+		if (!array_key_exists($field, $this->Fields)) return false;
+
+		if ($type == TYPE::ID || $type == TYPE::PARENT) $required = true;
+		
+		return ($this->Fields[$field] = new Field($type, $name, $required, $unique));
+	}
+	
 	protected function _record_changes ($validatedValues) {
 		// Insert
 		if ($validatedValues['id'] == 0) {
 			foreach ($validatedValues as $field => $value) {
 				if (!array_key_exists($field, $this->Fields)) continue;
-				if (sizeof($this->Fields[$field]->Errors) > 0) return false;
+				if (sizeof($this->Fields[$field]->Errors) > 0)
+					return false;
 			}
 	
 			$ret = $this->insert_data ($validatedValues);
@@ -909,7 +902,7 @@ abstract class MysqlTable implements Table
 			if (sizeof($this->Fields['id']->Errors) > 0) return false;
 			$ret = true;
 			foreach ($validatedValues as $field => $value) {
-				if (sizeof($this->Fields[$field]->Errors) == 0 && $value != $this->get_data($validatedValues['id'], $field)) {
+				if (sizeof($this->Fields[$field]->Errors) == 0 && ($this->Fields[$field]->Type == TYPE::FILE || $value != $this->get_data($validatedValues['id'], $field))) {
 					$ret = ($this->update_field ($validatedValues['id'], $field, $validatedValues[$field]) ? $ret : false);
 				}
 			}
@@ -940,7 +933,7 @@ abstract class MysqlTable implements Table
 		if (sizeof($fileFields) > 0)
 			$fullFields = implode(', ', array_keys($fileFields));
 		else $fullFields = 'id';
-		$reponse = $this->bdd->prepare ('SELECT '.$fullFields.' FROM '.$this->Table.' WHERE id = :id';
+		$reponse = $this->bdd->prepare ('SELECT '.$fullFields.' FROM '.$this->Table.' WHERE id = :id');
 		$reponse->bindParam('id', $id, PDO::PARAM_INT);
 		$ret = $reponse->execute();
 		if (!$ret) return false;
@@ -992,7 +985,8 @@ abstract class MysqlTable implements Table
 	}
 	
 	// Update field in DB
-	protected function update_field ($id, $field, $value) {
+	protected function update_field ($id, $field, $value='') {
+		$type = $this->Fields[$field]->Type;
 		if (!array_key_exists($field, $this->Fields)) return true;
 		if (!$this->rights_control(ACCESS::WRITE, $id)) {
 			array_push ($this->Fields['id']->Errors, SQL_ERR::ACCESS);
@@ -1002,9 +996,16 @@ abstract class MysqlTable implements Table
 			array_push ($this->Fields['id']->Errors, SQL_ERR::UNKNOWN);
 			return false;
 		}
-		if (!$this->isValidField($field, $value)) {
+		/*if (!$this->isValidField($field, $value)) {
 			array_push ($this->Fields[$field]->Errors, SQL_ERR::INVALID);
 			return false;
+		}*/
+		
+		if ($type == TYPE::FILE || $type == TYPE::PRELOAD) {
+			$value = $this->Fields[$field]->upload($this->Table, $field);
+			if (!$value) return false;
+			if ($type == TYPE::PRELOAD)
+				$field = UI_MyqslTable::removePreloadFileName ($field);	
 		}
 		
 		$reponse = $this->bdd->prepare('UPDATE '.$this->Table.' SET '.$field.' = :value WHERE id = :id');
@@ -1014,6 +1015,7 @@ abstract class MysqlTable implements Table
 			case TYPE::PARENT:
 			case TYPE::NUM:
 				$reponse->bindParam('value', $endValue, PDO::PARAM_INT); break;
+				
 			default: $reponse->bindParam('value', $endValue, PDO::PARAM_STR); break;
 		}
 		$reponse->bindParam('id', $id, PDO::PARAM_INT);
@@ -1024,7 +1026,7 @@ abstract class MysqlTable implements Table
 		return $ret;
 	}
 
-	// Private
+	// PRIVATE
 	// Insert full entry in DB, return false or ID of created entry
 	private function insert_data ($fields) {
 		if (!$this->rights_control(ACCESS::WRITE, 0, SessionManagement::getSessId())) {
@@ -1034,17 +1036,25 @@ abstract class MysqlTable implements Table
 
 		$echoValues = [];
 		foreach ($fields as $field => $value) {
-			if (!array_key_exists($field, $this->Fields) || $this->Fields[$field]->Type == TYPE::ID) {
+			$type = $this->Fields[$field]->Type;
+			if (!array_key_exists($field, $this->Fields) || $type == TYPE::ID) {
 				array_splice_by_key ($fields, $field, 1);
 				continue;
 			}
-			if (!$this->isValidField($field, $value)) {
+			/*if (!$this->isValidField($field, $value)) {
 				array_push ($this->Fields[$field]->Errors, SQL_ERR::INVALID);		
 				return false;
+			}*/
+			if ($type == TYPE::FILE || $type == TYPE::PRELOAD) {
+				$value = $this->Fields[$field]->upload($this->Table, $field);
+				if (!$value) return false;
+				if ($type == TYPE::PRELOAD)
+					$field = UI_MyqslTable::removePreloadFileName ($field);	
 			}
+		
 			$echoValues[$field] = ':'.strtolower($field);
 		}
-	
+		
 		$fullFields = implode(', ', array_keys($fields));
 		$fullValues = implode(', ', $echoValues);
 		echo $req;
@@ -1204,6 +1214,13 @@ abstract class UI_MysqlTable implements UI_Table
     function __construct() { }
 
 	// GENERICS
+	// return preload File field name
+	public static function preloadFileName ($field) {
+		return 'preload_'.$field;
+	}
+	public static function removePreloadfileName ($field) {
+		return str_replace ('preload_', '', $field);
+	} 
 	public static function secureText($texte) {
 		return htmlentities($texte, ENT_QUOTES);
 	}
@@ -1218,9 +1235,7 @@ abstract class UI_MysqlTable implements UI_Table
 		return str_replace (' [AT] ', '@', $mail);
 	}
 	
-
 	// SPECIFICS
-	
 	// Draw Delete form
 	protected static function _draw_delete_form ($action, $data, $table, $texte) {
 		do {

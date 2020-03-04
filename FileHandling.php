@@ -1,34 +1,48 @@
 <?php
-require_once ('Generic.php');
+require_once ('Field.php');
+
+interface FileInterface {
+	// Get current File object
+	public function getFileInfo ();
+	// Preload file in tmp dir (acces via JS)
+	public function preload ($field);
+	// Upload file in DB
+	public function upload ($table, $field);
+	// Validate POST field
+	public function validatePostedFile ($field);
+}
+
+interface UI_FileInterface {
+	// STATIC
+	public static function draw_fieldset ($field, $table, $maxSize, $image = "");
+}
 
 class FILE_ERR extends ERR {
-	const NOFILE =	10;
-	const SIZE =	11;
-	const TYPE =	12;
-	const UPLOAD =	20;
+	const NOFILE =	100;
+	const SIZE =	101;
+	const TYPE =	102;
+	const UPLOAD =	110;
 	
 	// Print errors
-	public static function print_errors ($Error, $data = [	'name' => "",
+	public static function print_errors ($Error, $data = [	'path' => "",
 															'size' => "",
 															'type' => ""
 										])
 	{
-		$message = "";
-		switch ($Error['type']) {
+
+		switch ($error) {
 			case self::NOFILE:
-				$message = '<h3 class="alert">Le fichier '.$data['name'].' est introuvable.</h3>';
+				echo '<h3 class="alert">Le fichier ';
+				self::replaceFields ('__path|choisi__', $data);
+				echo ' est introuvable.</h3>';
 				break;
 			case self::SIZE:
-				$message = '<h3 class="alert">Votre fichier est trop volumineux</h3>';
-				$message .= '<p class="alert">Merci de respecter la limite des '.($data['size'] / 1000000).'Mo par fichier.</p>';
+				'<h3 class="alert">Votre fichier est trop volumineux</h3>';
+				'<p class="alert">Merci de respecter la limite des '.($data['size'] / 1000000).'Mo par fichier.</p>';
 				break;
 			case self::TYPE:
-				$message = '<h3 class="alert">Votre fichier est de type incorrect</h3>';
-				$message .= '<p class="alert">Merci de choisir un fichier parmi les formats supportés : ';
-				foreach ($data['type'] as $types)
-					$arrayTypes[] = implode (', ', $types);
-				$message .= implode (', ', $arrayTypes);
-				$message .= '.</p>';
+				'<h3 class="alert">Votre fichier est de type incorrect</h3>';
+				'<p class="alert">Merci de choisir un fichier parmi les formats supportés : '.$data['type'].'</p>';
 				break;
 			case self::UPLOAD:
 				$message = '<h3 class="alert">Un erreur est survenue pendant le téléchargement de votre fichier</h3>';
@@ -38,10 +52,10 @@ class FILE_ERR extends ERR {
 				$Error = 	[	'name' => 'image',
 								'type' => $error
 							];
-				if (parent::print_errors ($Error, $data) !== false) return true;
-				else break;
+				return (parent::print_errors ($Error, $data) !== false);
 		}
-		return $message;
+		
+		return false;
 	}
 }
 
@@ -80,27 +94,131 @@ class HANDLERS extends ExtdEnum {
 		];
 }
 
-class File {
-	// Properties
-	public $Path = "";
-	public $Type = FILE_TYPE::__default;
-	public $Handlers = HANDLERS::__default;
+class File extends Field implements FileInterface {
+
+	// Constants
+	// Chemin vers fichiers finaux
+	const PATH_UPLOAD = array (
+		'tmp'		=> '../Administration/tmp/',
+		'assos'		=> '../Animations/Files/',
+		'assos_pages' => '../Animations/Files/',
+		'event'		=> '../Agenda/Files/',
+		'thumbs'	=> '../Collection/Files/thumbs/',
+		'galerie'	=> '../Collection/Files/masters/'
+	);
+	const FILIGRANE = '../Administration/Images/logofiligrane.png';
+	// Fichiers temporaires considérés trop vieux
+	const DELAY_OLDFILE = 1800; // 1800s = 30min
 	
-	// Construct
-	function __construct ($src, $okTypes) {
-		$this->validateFileData($src, $okTypes);
+	// Properties
+	public $Types = [ FILE_TYPE::__default ];
+	public $MaxSize;	// Taille max des fichiers
+	
+	private $path;
+	private $type = FILE_TYPE::__default;
+	
+	// Construct : list of supported types, maxSize (Mo)
+	function __construct ($name = '', $okTypes = [], $maxSize, $required = false, $unique = false) {
+		if (!is_numeric($maxSize)) return FILE_ERR::KO;
+		$this->MaxSize = $maxSize * 1000000;
+    	foreach ($okTypes as $type) {
+    		if (FILE_TYPE::hasKey($type)) {
+				array_push ($this->Types, $type);
+    		}
+    	}
+    	if (sizeof ($this->Types) == 0) return FILE_ERR::KO;		
+		
+		
+		if (!parent::__construct(TYPE::FILE, $name, $required, $unique)) return NULL;
+	}
+	
+	// ------- Interface Methods ---------
+	// PUBLIC	
+	// Getters
+	public function getFileInfo ($path = '') {
+		if ($path == '')
+			$path = substr ($this->path, strripos ('/', $this->path) + 1);
+		foreach ($data['type'] as $types)
+			$arrayTypes[] = implode (', ', $types);
+		$type = implode (', ', $arrayTypes);
+		$size = $this->Size;
+		
+		return array (	'path' => $path,
+						'type' => $type,
+						'size' => $size
+		);
+	}
+	
+	// Setters
+	// Preload POST file in tmp dir (updload via JS)
+	public function preload ($field) {
+		$err = $this->validateFileData ($_FILES[$field]['tmp_name'], $this->Types);
+		if ($err) FILE_ERR::print_errors( [ $err ], getFileInfo($_FILES[$field]['tmp_name']));
+		else echo self::PATH_UPLOAD['tmp'].$this->upload('tmp', $field);
+	}
+	
+	// Upload file, nom is a prefix
+	public function upload ($table, $field, $value='') {
+	// return final file path
+	
+		if (!array_key_exists($table, self::PATH_UPLOAD)) {
+			array_push ($this->Errors, FILE_ERR::KO);
+			return false;
+		}
+		// image déjà uploadée par JS
+		if ($field->Type == TYPE::PRELOAD) {
+			$file = array (
+				'name'		=> preg_replace ('#((.*)\/)+([0-9]+\.[A-Za-z]{3,4})$#', '$3', $value),
+				'tmp_name'	=> $value
+			);
+		}
+		// Sinon, on uploade
+		else $file = $_FILES[$field];
+		
+		$path = self::PATH_UPLOAD[$table];
+		$extension = strtolower(substr(strrchr($file['name'], '.'), 1));
+		$nom = $table.time().'.'.$extension;
+		
+		if ($field->Type == TYPE::PRELOAD) $move = rename($file['tmp_name'], $path.$nom);
+		else $move = move_uploaded_file($file['tmp_name'], $path.$nom);
+		
+		if ($move) return $nom;
+		array_push ($this->Errors, FILE_ERR_UPLOAD);
+		return false;
+	}
+
+	// Validate POST field
+	public function validatePostedFile ($field) {
+		// Contrôles préalables (erreurs PHP)
+		if (!isset($_FILES[$field])) return false;
+
+		if ($_FILES[$field]['error'] > 0) {
+			switch ($_FILES[$field]['error']) {
+				case UPLOAD_ERR_NO_FILE:
+					array_push ($this->Errors, FILE_ERR::NOFILE); return false;
+				case UPLOAD_ERR_INI_SIZE:
+				case UPLOAD_ERR_FORM_SIZE:
+					array_push ($this->Errors, FILE_ERR::SIZE); return false;
+				case UPLOAD_ERR_PARTIAL:
+					array_push ($this->Errors, FILE_ERR::UPLOAD); return false;
+			}
+		}
+		
+		return $this->validateFileData ($_FILES[$field]['tmp_name']);
 	}
 	
 	// PRIVATE
-	private function validateFileData ($src, $okTypes = []) {
-		if (!file_exists($src)) throw new Exception(	FILE_ERR::print_errors(	['type' => FILE_ERR::NOFILE],
-																				['name'	=> $src, 'type' => $okTypes]),
-														FILE_ERR::NOFILE );
+	// Validate file source and save data
+	private function validateFileData ($src) {
+		if (!file_exists($src)) {
+			array_push ($this->Errors, FILE_ERR::NOFILE);
+			return false;
+		}
 		// get handlers
 		$testedImage = false;
 		$handlers = NULL;
 		
-		foreach ($okTypes as $type) {
+		foreach ($this->Types as $type) {
 			switch ($type) {
 				// Images
 				case FILE_TYPE::JPG:
@@ -119,153 +237,17 @@ class File {
 			if ($handlers != NULL) break;
 		}
 
-		if ($handlers == NULL) throw new Exception(	FILE_ERR::print_errors(	['type' => FILE_ERR::TYPE],
-																			['name'	=> $src, 'type' => $okTypes]),
-														FILE_ERR::TYPE );
+		if ($handlers == NULL) {
+			array_push ($this->Errors, FILE_ERR::TYPE);
+			return false;
+		}
 
-		$this->Path = $src;
-		$this->Type = $handlers;
-	}
-}
-
-interface FileInterface {
-	// Get current File object
-	public function getFileInfo ();
-	// Preload file in tmp dir (acces via JS)
-	public function preload ($field);
-	// Uplloadd file in DB
-	public function upload ($table, $field);
-}
-
-interface UI_File {
-	// Preload file in tmp dir (acces via JS)
-	public static function draw_fieldset ($field, $table, $maxSize, $image = "");
-}
-
-class FileManagement implements FileInterface
-{
-	// Constants
-	// Chemin vers fichiers finaux
-	const PATH_UPLOAD = array (
-		'tmp'		=> '../Administration/tmp/',
-		'asso'		=> '../Animations/Files/',
-		'event'		=> '../Agenda/Files/',
-		'thumbs'	=> '../Collection/Files/thumbs/',
-		'galerie'	=> '../Collection/Files/masters/'
-	);
-	const FILIGRANE = '../Administration/Images/logofiligrane.png';
-
-	// Link image type to correct image loader and saver
-	// - makes it easier to add additional types later on
-	// - makes the function easier to read
-	
-	// Properties
-	public $MaxSize;		// Taille max des fichiers
-	public $Types = [];		// Format de fichiers acceptés
-	
-	private $File = NULL;
-
-	// Methods
-	// Construct : maxSize (Mo), list of supported types
-    function __construct ($maxSize, $types = array(), $file = NULL) {
-    	if (!is_numeric ($maxSize)) throw new Exception(	FILE_ERR::print_errors(	['type' => FILE_ERR::KO],
-																					['name'	=> $file]),
-															FILE_ERR::KO );
-    	$this->MaxSize = $maxSize * 1000000;
-    	
-    	foreach ($types as $type) {
-    		if (FILE_TYPE::hasKey($type)) {
-				array_push ($this->Types, $type);
-    		}
-    	}
-    	if (sizeof ($this->Types) == 0) throw new Exception(	FILE_ERR::print_errors(	['type' => FILE_ERR::KO],
-																						['name'	=> $file]),
-																FILE_ERR::KO );
-    	
-    	if ($file) {
-    		try { $this->File = new File ($file, $this->Types); }
-    		catch (Exception $e) { throw $e; }
-    	}
-    }
-
-	// PUBLIC
-	// Get current File object
-	public function getFileInfo () {
-		return array (	'path' => $this->File->Path,
-						'type' => $this->File->Type
-		);
+		$this->src = $src;
+		$this->type = $handlers;
+		
+		return FILE_ERR::OK;
 	}
 	
-	// Preload file in tmp dir (updload via JS)
-	public function preload ($field) {
-		try {
-			$File = new File ($_FILES[$field]['tmp_name'], $this->Types);
-			echo self::PATH_UPLOAD['tmp'].$this->upload('tmp', $field);
-		}
-		catch (Exception $err) { echo $err->getMessage(); }
-	}
-	
-	public function upload ($table, $field) {
-	// une valeur de retour numérique représente une erreur
-	// sinon, on retourne le chemin du fichier final
-		// image déjà uploadée par JS
-		if ($field == 'uploaded') {
-			$file = array (
-				'name'		=> preg_replace ('#((.*)\/)+([0-9]+\.[A-Za-z]{3,4})$#', '$3', $_POST['uploaded']),
-				'tmp_name'	=> $_POST['uploaded']
-			);
-		}
-		// Sinon, on uploade
-		else $file = $_FILES[$field];
-		$extension = strtolower(substr(strrchr($file['name'], '.'), 1));
-		
-		switch ($table) {
-			case 'asso':
-			case 'chap':
-				$nom = $table;
-				$path = self::PATH_UPLOAD['asso'];
-				break;
-			
-			default:
-				$nom = "";
-				$path = self::PATH_UPLOAD[$table];
-				break;
-		}
-		$nom .= time().'.'.$extension;
-		
-		if ($field == 'uploaded') $move = rename($file['tmp_name'], $path.$nom);
-		else $move = move_uploaded_file($file['tmp_name'], $path.$nom);
-		
-		if ($move) { return $nom; }
-		else { return 1; }
-	}
-
-	// PRIVATE
-	private function test ($field) {
-		// Contrôles préalables (erreurs PHP)
-		if (!isset($_FILES[$field]))
-			return FILE_ERR::NOFILE;
-		if ($_FILES[$field]['error'] > 0) {
-			switch ($_FILES[$field]['error']) {
-				case UPLOAD_ERR_NO_FILE:
-					return FILE_ERR::NOFILE;
-				case UPLOAD_ERR_INI_SIZE:
-				case UPLOAD_ERR_FORM_SIZE:
-					return FILE_ERR::SIZE;
-				case UPLOAD_ERR_PARTIAL:
-					return FILE_ERR::UPLOAD;
-			}
-		}
-		
-		// Contrôle du format
-		try {
-			$file = new File ($_FILE['name'], $this->Types);
-			$this->File = $file;
-			return FILE_ERR::OK;
-		}
-		catch (Exception $err) { return $err->getCode; }
-	}
-
 	/**
 	 * @param $src - a valid file location
 	 * @param $filigrane - l'image à apposer (png transparent)
@@ -428,7 +410,7 @@ class FileManagement implements FileInterface
 	}
 }
 
-class UI_FileManagement implements UI_File {
+class UI_File implements UI_FileInterface {
 	// prevent instanciation
 	function construct() { }
 	
@@ -444,7 +426,7 @@ class UI_FileManagement implements UI_File {
 			if ($image != "") echo 'style="display: block;" ';
 			echo 'src="'.$image.'" alt="" />';
 			echo '<img id="loading" src="../Styles/loading.png" alt="chargement" />';
-			echo '<input type="hidden" name="uploaded" id="uploaded" value="'.$image.'" />';
+			echo '<input type="hidden" name="'.UI_MysqlTable::preloadFileName($field).'" id="uploaded" value="'.$image.'" />';
 			echo '<img class="imgButton" id="deleteimg" ';
 			if ($image == "") { echo 'style="visibility: hidden;" '; }
 			echo 'alt="x" title="Supprimer cette image" src="../Styles/remove.png" onmousedown="this.src=\'../Styles/remove-clic.png\';" onmouseup="this.src=\'../Styles/remove.png\';" onmouseout="this.src=\'../Styles/remove.png\';" onclick="supprImage(\''.$image.'\');" ';

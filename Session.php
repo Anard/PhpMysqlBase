@@ -84,8 +84,6 @@ interface Session {
 	// Redirections habitelles
 	const ADMIN_HOME = 'Users.php';
 	const HOME = '../Musee/';
-	// Fichiers considérés trop vieux
-	const DELAY_OLDFILE = 1800; // 1800s = 30min
 	// Sel de chiffrage
 	//const SALT = 'bf156è§4563ko%2545FTYfecqnibh54fvdwbhgyiG';
 
@@ -463,12 +461,12 @@ final class SessionManagement implements Session
 	private function cleanTempDir () {
 		require_once ('../ClassesBase/FileHandling.php');
 		$now = time();
-		if ($dossier = opendir (FileManagement::PATH_UPLOAD['tmp'])) {
+		if ($dossier = opendir (File::PATH_UPLOAD['tmp'])) {
 			while (false !== ($file = readdir($dossier))) {
 			    if ($file != '.' && $file != '..' && $file != 'index.php') {
-			    	$date = filemtime (FileManagement::PATH_UPLOAD['tmp'].$file);
-			    	if ($date < $now - self::DELAY_OLDFILE) {
-			    		if (file_exists(FileManagement::PATH_UPLOAD['tmp'].$file)) unlink (FileManagement::PATH_UPLOAD['tmp'].$file);
+			    	$date = filemtime (File::PATH_UPLOAD['tmp'].$file);
+			    	if ($date < $now - File::DELAY_OLDFILE) {
+			    		unlink (File::PATH_UPLOAD['tmp'].$file);
 			    	}
 			    }
 			}
