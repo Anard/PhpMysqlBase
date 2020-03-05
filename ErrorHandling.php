@@ -17,7 +17,7 @@ class ERR extends ExtdEnum
 	public static function replaceFields ($text, $data = []) {
 		if (preg_match ('#__([\d\w_-]*)(\|[^_]*)?__#', $text, $fields) == 1) {
 			array_shift($fields);
-			
+
 			foreach($fields as $field) {
 				$pattern = "#__".$field."(\|([^_]*))?__#";
 				if (!array_key_exists($field, $data) || $data[$field] == "")

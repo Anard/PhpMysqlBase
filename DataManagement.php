@@ -7,7 +7,7 @@ class DataManagement {
 	public static function secureText($texte) {
 		return htmlentities($texte, ENT_QUOTES);
 	}
-	public static function afficheDate($date, $dest = 'write') {
+	public static function afficheDate($date, $dest = 'print') {
 		switch ($dest) {
 			case 'form':	return $date->format('Y-m-d');
 			case 'short':	return $date->format('j/m/y');

@@ -630,8 +630,8 @@ abstract class MysqlTable implements Table
 					}
 				}
 				else {
-					if ($this->Limiting != "") $limit = ' AND '.$this->Limiting;
-					$reponse = $this->bdd->prepare('SELECT '.$fields.' FROM '.$this->Table.' WHERE id = :id'.$limit.$this->getOrdering());
+					// do not limit if getting single id
+					$reponse = $this->bdd->prepare('SELECT '.$fields.' FROM '.$this->Table.' WHERE id = :id'.$this->getOrdering());
 					$reponse->bindParam('id', $get, PDO::PARAM_INT);
 					$reponse->execute();
 					$donnees = $reponse->fetch();
@@ -924,7 +924,7 @@ abstract class MysqlTable implements Table
 				include ('../Config/config.php');
 				$item = AUTHORISED::_ITEM[$this->rights[ACCESS::WRITE]];
 				// Delete children
-				foreach ($childTable as $this->childsTables) {
+				foreach ($this->childsTables as $childTable) {
 					$reponse = $this->bdd->prepare ('DELETE FROM '.$childTable.' WHERE '.$item.' = :id');
 					$reponse->bindParam('id', $id, PDO::PARAM_INT);
 					$ret = $reponse->execute();
