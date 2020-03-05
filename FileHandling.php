@@ -173,7 +173,7 @@ class File extends Field implements FileInterface {
 	// Setters
 	// Preload POST file in tmp dir (updload via JS)
 	public function preload ($field) {
-		$err = $this->	validateFileData ($_FILES[$field]['tmp_name']);
+		$err = $this->validateFileData ($_FILES[$field]['tmp_name']);
 		if ($err) FILE_ERR::print_errors([ $err ], $this->getFileInfo($_FILES[$field]['tmp_name']));
         else {
             $tmpFileName = $this->upload('tmp', $field);
