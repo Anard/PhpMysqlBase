@@ -12,6 +12,7 @@ function array_splice_by_key (&$array, $key, $length='ALL', $replacement=array()
 
 // BASE CLASS FOR MYSQL TABLES, have to be extended at least by BASE_ExtendTable
 require_once ('Session.php');
+	require_once ('DataManagement.php');
 require_once ('FileHandling.php');
 
 // ----------- GLOBAL Table INTERFACE to implement in child classes ------------
@@ -1126,12 +1127,12 @@ abstract class MysqlTable implements Table
 				return date('H:m', strtotime($data));
 			
 			case TYPE::COLOR:
-				return preg_replace('#\s#', '', UI_MysqlTable::secureText($data));
+				return preg_replace('#\s#', '', DataManagement::secureText($data));
 			case TYPE::FILE: if (is_array($data)) break;	// files' $value is an array [ 'tmp_name', 'name', 'error', etc ] only when posted
 															// it's text when from DB
 				
 			default:
-				return UI_MysqlTable::secureText($data);
+				return DataManagement::secureText($data);
 		}
 	}
 	
@@ -1209,19 +1210,6 @@ abstract class UI_MysqlTable implements UI_Table
 	public static function removePreloadfileName ($field) {
 		return str_replace ('preload_', '', $field);
 	} 
-	public static function secureText($texte) {
-		return htmlentities($texte, ENT_QUOTES);
-	}
-	protected static function afficheDate($date, $dest = 'write') {
-		switch ($dest) {
-			case 'form':	return $date->format('Y-m-d');
-			case 'short':	return $date->format('j/m/y');
-			default:		return $date->format('j/m/Y');
-		}
-	}
-	protected static function afficheMail($mail) {
-		return str_replace (' @ ', ' [AT] ', $mail);
-	}
 	
 	// SPECIFICS
 	// Draw Delete form

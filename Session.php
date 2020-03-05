@@ -1,6 +1,7 @@
 <?php
 require_once ('ErrorHandling.php');
-
+require_once ('DataManagement.php');
+	
 // ERRORS
 class SESS_ERR extends ERR {
 	// session
@@ -120,6 +121,7 @@ final class SessionManagement implements Session
 	private $Table; 
 	//mutable
 	private $Errors = [];
+	private $finalTarget;
 	
 	// Constructor
 	function __construct () {
@@ -127,7 +129,9 @@ final class SessionManagement implements Session
 			session_start();
 		
 		if (isset($_GET['error']) && $_GET['error'] != "")
-			array_push ($this->Errors, $_GET['error']);
+			array_push ($this->Errors, DataManagement::secureText($_GET['error']));
+		if (isset($_GET['goto']) && $_GET['goto'] != "")
+			$finalTarget = DataManagement::secureText($_GET['goto']);
 		
 		include ('../Config/config.php');
 		$this->Table = $prefixe.'echecs';
