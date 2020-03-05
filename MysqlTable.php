@@ -829,7 +829,7 @@ abstract class MysqlTable implements Table
 					break;
 					
 				case TYPE::PASSWD:
-					if ($nbErrors > 0 && ($nbErrors > 1 || $this->Fields[$field]->Errors[0] != SQL_ERR::NEEDED))
+					if ($value == "" || ($nbErrors > 0 && ($nbErrors > 1 || $this->Fields[$field]->Errors[0] != SQL_ERR::NEEDED)))
 						$validValues[$field] = $this->Defaults[$field];
 					else $validValues[$field] = password_hash ($value, PASSWORD_DEFAULT);
 					break;
@@ -870,28 +870,18 @@ abstract class MysqlTable implements Table
 	protected function _record_changes ($validatedValues) {
 		// Insert
 		if ($validatedValues['id'] == 0) {
-			foreach ($validatedValues as $field => $value) {
-				if (!array_key_exists($field, $this->Fields)) continue;
-				if (sizeof($this->Fields[$field]->Errors) > 0)
-					return false;
-			}
-	
 			$ret = $this->insert_data ($validatedValues);
 			if (is_numeric ($ret) && $ret > 0) $this->load_id ($ret, ACCESS::WRITE);
 			return $ret;
 		}
 
+		// Update
 		elseif (sizeof($this->Fields['id']->Errors) == 0) {
-			// Update
-			if (sizeof($this->Fields['id']->Errors) > 0) return false;
-			$ret = true;
-			foreach ($validatedValues as $field => $value) {
-				if (sizeof($this->Fields[$field]->Errors) == 0 && ($this->Fields[$field]->Type == TYPE::FILE || $value != $this->get_data($validatedValues['id'], $field))) {
-					$ret = ($this->update_field ($validatedValues['id'], $field, $validatedValues[$field]) ? $ret : false);
-				}
-			}
-			if ($ret) $this->load_id ($validatedValues['id']);
-			return $ret;	
+			$ret = false;	// $ret is true if one modif executed
+			foreach ($validatedValues as $field => $value)
+				$ret = ($this->update_field ($validatedValues['id'], $field, $validatedValues[$field]) === true ? true : $ret);
+			$this->load_id ($validatedValues['id']);
+			return $ret;
 		}
 		
 		return false;
@@ -968,10 +958,10 @@ abstract class MysqlTable implements Table
 		return $ret;
 	}
 	
-	// Update field in DB
-	protected function update_field ($id, $field, $value='') {
+	// Update field in DB, return field as been modified
+	protected function update_field ($id, $field, $value="") {
 		$type = $this->Fields[$field]->Type;
-		if (!array_key_exists($field, $this->Fields)) return true;
+		if (!array_key_exists($field, $this->Fields)) return false;
 		if (!$this->rights_control(ACCESS::WRITE, $id)) {
 			array_push ($this->Fields['id']->Errors, SQL_ERR::ACCESS);
 			return false;
@@ -980,13 +970,12 @@ abstract class MysqlTable implements Table
 			array_push ($this->Fields['id']->Errors, SQL_ERR::UNKNOWN);
 			return false;
 		}
-		/*if (!$this->isValidField($field, $value)) {
-			array_push ($this->Fields[$field]->Errors, SQL_ERR::INVALID);
-			return false;
-		}*/
+		if (sizeof($this->Fields[$field]->Errors) > 0) return false;
+		if ($value == $this->get_data(['id'], $field)) return false;
+		if ($type == TYPE::PASSWD && $value == "") return false;
 		
 		if ($type == TYPE::FILE || $type == TYPE::PRELOAD) {
-			if ($type == TYPE::PRELOAD && $value != '') {
+			if ($type == TYPE::PRELOAD && $value != "") {
 				$fileField = UI_MysqlTable::removePreloadFileName($field);
 				$value = $this->Fields[$fileField]->upload($this->Table, $field);
 			}
@@ -1020,7 +1009,9 @@ abstract class MysqlTable implements Table
 			array_push ($this->Fields['id']->Errors, SQL_ERR::ACCESS);
 			return false;
 		}
-			
+		if (sizeof($this->Fields['id']->Errors) > 0)
+			return false;
+
 		$echoValues = [];
 		foreach ($fields as $field => $value) {
 			$type = $this->Fields[$field]->Type;
@@ -1028,10 +1019,9 @@ abstract class MysqlTable implements Table
 				array_splice_by_key ($fields, $field, 1);
 				continue;
 			}
-			/*if (!$this->isValidField($field, $value)) {
-				array_push ($this->Fields[$field]->Errors, SQL_ERR::INVALID);		
+			if (sizeof($this->Fields[$field]->Errors) > 0)
 				return false;
-			}*/
+
 			if ($type == TYPE::FILE || $type == TYPE::PRELOAD) {
 				if ($type == TYPE::PRELOAD && $value != '') {
 					$fileField = UI_MysqlTable::removePreloadFileName($field);

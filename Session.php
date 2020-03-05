@@ -194,6 +194,12 @@ final class SessionManagement implements Session
 		return $donnees;
 	}
 
+	// Update Session's Login
+	public static function updateLogin($db) {
+		$user = self::getUserInfo ($db);
+		$_SESSION['Login'] = $user['Login'];
+	}
+	
 	// Update preferences
 	public static function updateCookies() {
 		$cookies = PREFS::getConstList();
@@ -245,7 +251,7 @@ final class SessionManagement implements Session
 			}
 				
 			// Check user
-			$user = $this->getUserInfo($bdd, $_POST['login']);
+			$user = self::getUserInfo($bdd, $_POST['login']);
 			if (!$user) {
 				$bdd = NULL;
 				session_destroy();
@@ -345,7 +351,7 @@ final class SessionManagement implements Session
 		else $this->generateTicket();
 		
 		// Get logged user
-		$userInfo = $this->getUserInfo($bdd);
+		$userInfo = self::getUserInfo($bdd);
 		$bdd = NULL;
 		
 		// Check login match
@@ -417,7 +423,7 @@ final class SessionManagement implements Session
 		else exit();
 	}
 	
-	private function getUserInfo ($db, $Login='') {
+	private static function getUserInfo ($db, $Login='') {
 		include ('../Config/config.php');
 		$Table = $prefixe.'users';
 		if ($Login != '') {
