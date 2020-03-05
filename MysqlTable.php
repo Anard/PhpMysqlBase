@@ -678,7 +678,7 @@ abstract class MysqlTable implements Table
 		// prepare data
 		$postedValues = array_merge ($_POST, $_FILES);
 		
-		$validatedValues = $this->_validate_posted_data($this->secure_data($postedValues));
+		$validatedValues = $this->_validate_posted_data($this->secure_data($postedValues, true));
 		// post
 		return $this->_record_changes ($validatedValues);
 	}
@@ -1086,12 +1086,12 @@ abstract class MysqlTable implements Table
 		return $donnees['id'];
 	}
 	
-	// Secure array for printing
-	protected function secure_data ($data) {
+	// Secure array for printing, set $record = true destination is DB
+	protected function secure_data ($data, $record = false) {
 		foreach ($data as $key => &$value) {
 			if (!array_key_exists($key, $this->Fields)) continue;
 			if ($value != "")
-				$value = $this->_secure_data ($value, $this->Fields[$key]->Type);
+				$value = $this->_secure_data ($value, $this->Fields[$key]->Type, $record);
 		}
 		unset($value); // break the reference with the last element
 		
@@ -1099,7 +1099,7 @@ abstract class MysqlTable implements Table
 	}
 	
 	// Récupération d'une donnée d'un type précis (BDD ou entrée utilisateur)
-	private function _secure_data ($data, $type = TYPE::NONE) {
+	private function _secure_data ($data, $type = TYPE::NONE, $record = false) {
 		switch ($type) {
 			case TYPE::BOOL:
 				return ($data ? true : false);
@@ -1122,7 +1122,8 @@ abstract class MysqlTable implements Table
 															// it's text when from DB
 				
 			default:
-				return DataManagement::secureText($data);
+				if ($record) return $data;
+				else return DataManagement::secureText($data);
 		}
 	}
 	
