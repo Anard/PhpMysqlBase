@@ -365,7 +365,8 @@ abstract class MysqlTable implements Table
 		if (is_null($read_write)) $read_write = $this->default_access;
 		if (!ACCESS::hasKey($read_write)) return false;
 		if ($this->rights[$read_write] == AUTHORISED::ALL) return true;
-		if ($userid == 0 && SessionManagement::isAdmin()) return true;
+		//if ($userid == 0 && SessionManagement::isAdmin()) return true;
+		if (SessionManagement::isAdmin()) return true;
 		if ($this->rights[$read_write] == AUTHORISED::PARENT)
 			return $this->Parent->rights_control($read_write);
 		if ($this->rights[$read_write] == AUTHORISED::MMM)
@@ -1019,7 +1020,6 @@ abstract class MysqlTable implements Table
 			array_push ($this->Fields['id']->Errors, SQL_ERR::ACCESS);
 			return false;
 		}
-		print_r($fields);
 			
 		$echoValues = [];
 		foreach ($fields as $field => $value) {
@@ -1128,7 +1128,8 @@ abstract class MysqlTable implements Table
 			
 			case TYPE::COLOR:
 				return preg_replace('#\s#', '', UI_MysqlTable::secureText($data));
-			case TYPE::FILE: break;	// files' $value is an array [ 'tmp_name', 'name', 'error', etc ]
+			case TYPE::FILE: if (is_array($data)) break;	// files' $value is an array [ 'tmp_name', 'name', 'error', etc ] only when posted
+															// it's text when from DB
 				
 			default:
 				return UI_MysqlTable::secureText($data);

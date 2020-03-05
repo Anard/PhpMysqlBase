@@ -441,7 +441,6 @@ class UI_File implements UI_FileInterface {
 	public static function draw_fieldset ($field, $table, $maxSize, $image = "") {
 		if (!is_numeric($maxSize)) return false;
 		if (!file_exists($image) || !is_file($image)) $image = "";
-		
 		echo '<div class="container">';
 			echo '<p>Vous pouvez choisir une image (jpg, png, gif) pour illustrer la page (maximum '.$maxSize.'Mo).</p>';
 			echo '<input type="hidden" name="MAX_FILE_SIZE" value="'.($maxSize * 1000000).'" />';
