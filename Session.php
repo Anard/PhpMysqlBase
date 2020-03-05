@@ -153,9 +153,20 @@ final class SessionManagement implements Session
 	}
 
 	// Return true if admin
-	public static function isAdmin() {
-		if (session_status() !== PHP_SESSION_ACTIVE) return false;
-		else return ($_SESSION['Admin'] === true);	
+	public static function isAdmin($userid = 0) {
+		if (session_status() !== PHP_SESSION_ACTIVE || !is_numeric($userid)) return false;
+		elseif ($userid == 0) return ($_SESSION['Admin'] === true);
+		else {
+			include ('../Config/connexion.php');
+			$Table = $prefixe.'users';
+			$reponse = $bdd->prepare ('SELECT Admin FROM '.$Table.' WHERE id = :userid');
+			$reponse->bindParam ('userid', $userid, PDO::PARAM_INT);
+			$reponse->execute();
+			$donnees = $reponse->fetch();
+			$reponse->closeCursor();
+			$bdd = NULL;
+			return ($donnees && $donnees['Admin']);
+		}
 	}
 	
 	// Return Session ID

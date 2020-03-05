@@ -365,8 +365,7 @@ abstract class MysqlTable implements Table
 		if (is_null($read_write)) $read_write = $this->default_access;
 		if (!ACCESS::hasKey($read_write)) return false;
 		if ($this->rights[$read_write] == AUTHORISED::ALL) return true;
-		//if ($userid == 0 && SessionManagement::isAdmin()) return true;
-		if (SessionManagement::isAdmin()) return true;
+		if (SessionManagement::isAdmin($userid)) return true;
 		if ($this->rights[$read_write] == AUTHORISED::PARENT)
 			return $this->Parent->rights_control($read_write);
 		if ($this->rights[$read_write] == AUTHORISED::MMM)
