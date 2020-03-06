@@ -2,9 +2,16 @@
 require_once ('Field.php');
 
 interface FileInterface {
+	// STATIC
+	// Get preload file name
+	public static function preloadFileName ($field);
+	
+	// PUBLIC
 	public function print_errors();
 	// Get current File object
 	public function getFileInfo ();
+	// Delete file
+	public function delete($path);
 	// Preload file in tmp dir (acces via JS)
 	public function preload ($field);
 	// Upload file in DB
@@ -65,33 +72,7 @@ class FILE_TYPE extends ExtdEnum {
 	const PDF = ['pdf'];
 }
 
-/*class HANDLERS extends ExtdEnum {
-	// const NAME is exif's output (const returned by exif_imagetype for images)
-	const __default = NULL;
-	
-	const IMAGE_JPEG = [
-			'type' => FILE_TYPE::JPG,
-		    'load' => 'imagecreatefromjpeg',
-		    'save' => 'imagejpeg',
-		    'quality' => 96,
-		    'header' => 'image/jpeg'
-		];
-	const IMAGE_PNG = [
-			'type' => FILE_TYPE::PNG,
-		    'load' => 'imagecreatefrompng',
-		    'save' => 'imagepng',
-		    'quality' => 0,
-		    'header' => 'image/png'
-		];
-	const IMAGE_GIF = [
-			'type' => FILE_TYPE::GIF,
-		    'load' => 'imagecreatefromgif',
-		    'save' => 'imagegif',
-		    'header' => 'image/gif'
-		];
-}*/
-
-class File extends Field implements FileInterface {
+class FileField extends Field implements FileInterface {
 
 	// Constants
 	// Chemin vers fichiers finaux
@@ -122,15 +103,17 @@ class File extends Field implements FileInterface {
 											'save' => 'imagegif',
 											'header' => 'image/gif']
 	];
-
+	
+	const PRELOAD_FILENAME = 'preload';
 	
 	// Properties
 	public $Types = [ FILE_TYPE::__default ];
 	public $MaxSize;	// Taille max des fichiers
-	public $type = FILE_TYPE::__default;
-	// Internal preload Field
-	private $Preload;
-	
+	// Internal
+	private $Preload = NULL;				// preload field
+	public $path = NULL;
+	public $type = FILE_TYPE::__default;	// final type
+
 	// Construct : list of supported types, maxSize (Mo)
 	function __construct ($name = '', $okTypes = [], $maxSize, $required = false, $unique = false) {
 		if (!is_numeric($maxSize)) return FILE_ERR::KO;
@@ -145,10 +128,17 @@ class File extends Field implements FileInterface {
     	else array_shift($this->Types);
 		
 		if (!parent::__construct(TYPE::FILE, $name, $required, $unique)) return NULL;
-		$this->Preload = new Field (TYPE::PRELOAD, $this->preloadFileName());
+		// create preload field if needed
+		if ($name != self::preloadFileName($name)) $this->Preload = new Field (TYPE::TEXT, self::preloadFileName($name));
 	}
 	
 	// ------- Interface Methods ---------
+	// STATIC
+	// return preload File field name
+	public static function preloadFileName ($field) {
+		return self::PRELOAD_FILENAME.'_'.DataManagement::secureText($field);
+	}
+
 	// PUBLIC	
 	public function print_errors() {
 		foreach ($this->Errors as &$Error)
@@ -172,9 +162,19 @@ class File extends Field implements FileInterface {
 	}
 	
 	// Setters
+	// Delete file
+	public function delete($path) {
+		if (file_exists($path)) {
+			unlink ($path);
+			return true;
+		}
+		return false;
+	}
+
 	// Preload POST file in tmp dir (updload via JS)
 	public function preload ($field) {
-		$err = $this->validateFileData ($_FILES[$field]['tmp_name']);
+		// field is a regular posted file, just record it in temp directory and return full path to uploaded file
+		$err = $this->validatePostedFile ($field);
 		if ($err) FILE_ERR::print_errors([ $err ], $this->getFileInfo($_FILES[$field]['tmp_name']));
         else {
             $tmpFileName = $this->upload('tmp', $field);
@@ -184,20 +184,27 @@ class File extends Field implements FileInterface {
         }
 	}
 	
-	// Upload file, nom is a prefix
-	public function upload ($table, $field, $value='') {
-	// return final file path
-	
+	// Upload file, returns final file name
+	public function upload ($table, $field) {
+		$field = DataManagement::secureText($field);
+
 		if (!array_key_exists($table, self::PATH_UPLOAD)) {
 			array_push ($this->Errors, FILE_ERR::KO);
 			return NULL;
 		}
-		// image déjà uploadée par JS
-		if ($this->Type == TYPE::PRELOAD) {
-			$file = array (
-				'name'		=> preg_replace ('#((.*)\/)+([0-9]+\.[A-Za-z]{3,4})$#', '$3', $value),
-				'tmp_name'	=> $value
-			);
+		
+		// Before upload, data should have been validated. If we use preloaded file, $_FILES[$field] have been unset;
+		// ever uploaded in temp dir
+		if (!isset($_FILES[$field])) {
+			if (!isset($_POST[$this->Preload->Name]) || $_POST[$this->Preload->Name] == '')
+				return NULL;
+			else {
+				$file = array (
+					'name'		=> preg_replace ('#((.*)\/)+(tmp[0-9]+\.[A-Za-z]{3,4})$#', '$3', $preloadedValue),
+					'tmp_name'	=> DataManagement::secureText($_POST[$this->Preload->Name])
+				);
+				$field = $this->Preload->Name;
+			}
 		}
 		// Sinon, on uploade
 		else $file = $_FILES[$field];
@@ -206,7 +213,8 @@ class File extends Field implements FileInterface {
 		$extension = strtolower(substr(strrchr($file['name'], '.'), 1));
 		$nom = $table.time().'.'.$extension;
 		
-		if ($this->Type == TYPE::PRELOAD) $move = rename($file['tmp_name'], $path.$nom);
+		if ($this->Preload !== NULL && $field == $this->Preload->Name)
+			$move = rename($file['tmp_name'], $path.$nom);
 		else $move = move_uploaded_file($file['tmp_name'], $path.$nom);
 		
 		if ($move) return $nom;
@@ -216,32 +224,42 @@ class File extends Field implements FileInterface {
 
 	// Validate POST field
 	public function validatePostedFile ($field) {
+		$field = DataManagement::secureText($field);
+		$err = FILE_ERR::OK;
+		
 		// Contrôles préalables (erreurs PHP)
-		if (!isset($_FILES[$field])) return FILE_ERR::KO;
-
-		if ($_FILES[$field]['error'] > 0) {
+		if (!isset($_FILES[$field])) $err = FILE_ERR::KO;
+		elseif ($_FILES[$field]['error'] > 0) {
 			switch ($_FILES[$field]['error']) {
 				case UPLOAD_ERR_INI_SIZE:
-				case UPLOAD_ERR_FORM_SIZE:	return FILE_ERR::SIZE;
-				case UPLOAD_ERR_PARTIAL:	return FILE_ERR::UPLOAD;
-				case UPLOAD_ERR_NO_FILE:
-					$this->src = ''; $this->type = FILE_TYPE::__default;
-					return FILE_ERR::OK;	// on ne bloque pas s'il n'y a pas de fichier, mais on retourrne des valeurs nulles
-				default:					return FILE_ERR::KO;
-			
+				case UPLOAD_ERR_FORM_SIZE:	$err = FILE_ERR::SIZE; break;
+				case UPLOAD_ERR_PARTIAL:	$err = FILE_ERR::UPLOAD; break;
+				case UPLOAD_ERR_NO_FILE:	$err = FILE_ERR::NOFILE; break;
+				default:					$err = FILE_ERR::KO; break;
 			}
 		}
 		
-		return $this->validateFileData ($_FILES[$field]['tmp_name']);
+		// try to validate this file
+		if ($err == FILE_ERR::OK)
+			$err = $this->validateFileData ($_FILES[$field]['tmp_name']);
+		
+		switch ($err) {
+			case FILE_ERR::KO:
+			case FILE_ERR::NOFILE:
+				// try preload field
+				if ($this->Preload !== NULL && isset($_POST[$this->Preload->Name])) {
+					unset ($_FILES[$field]);
+					$err = $this->validateFileData (DataManagement::secureText($_POST[$this->Preload->Name]));
+				}
+				// else continue to return error
+			
+			case FILE_ERR::OK:
+			default: break;
+		}
+		return $err;
 	}
 	
 	// PRIVATE
-	//Getters
-	// return preload File field name
-	private function preloadFileName () {
-		return 'preload_'.$this->Name;
-	}
-	
 	// Setters
 	// Validate file source and save data
 	private function validateFileData ($src) {
@@ -272,8 +290,7 @@ class File extends Field implements FileInterface {
 		}
 
 		if (!$handlers) return FILE_ERR::TYPE;
-				
-		$this->src = $src;
+		$this->path = $src;
 		$this->type = $handlers;
 		
 		return FILE_ERR::OK;
@@ -456,7 +473,7 @@ class UI_File implements UI_FileInterface {
 			if ($image != "") echo 'style="display: block;" ';
 			echo 'src="'.$image.'" alt="" />';
 			echo '<img id="loading" src="../Styles/loading.png" alt="chargement" />';
-			echo '<input type="hidden" name="'.UI_MysqlTable::preloadFileName($field).'" id="uploaded" value="'.$image.'" />';
+		echo '<input type="hidden" name="'.FileField::preloadFileName($field).'" id="uploaded" value="'.$image.'" />';
 			echo '<img class="imgButton" id="deleteimg" ';
 			if ($image == "") { echo 'style="visibility: hidden;" '; }
 			echo 'alt="x" title="Supprimer cette image" src="../Styles/remove.png" onmousedown="this.src=\'../Styles/remove-clic.png\';" onmouseup="this.src=\'../Styles/remove.png\';" onmouseout="this.src=\'../Styles/remove.png\';" onclick="supprImage(\''.$image.'\');" ';

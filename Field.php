@@ -22,7 +22,6 @@ class TYPE extends ExtdEnum
 	const PASSWD =	22;
 	
 	const FILE =	30;
-	const PRELOAD =	31;
 }
 
 // Fields

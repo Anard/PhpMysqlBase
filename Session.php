@@ -478,12 +478,12 @@ final class SessionManagement implements Session
 	private function cleanTempDir () {
 		require_once ('../ClassesBase/FileField.php');
 		$now = time();
-		if ($dossier = opendir (File::PATH_UPLOAD['tmp'])) {
+		if ($dossier = opendir (FileField::PATH_UPLOAD['tmp'])) {
 			while (false !== ($file = readdir($dossier))) {
 			    if ($file != '.' && $file != '..' && $file != 'index.php') {
-			    	$date = filemtime (File::PATH_UPLOAD['tmp'].$file);
-			    	if ($date < $now - File::DELAY_OLDFILE) {
-			    		unlink (File::PATH_UPLOAD['tmp'].$file);
+			    	$date = filemtime (FileField::PATH_UPLOAD['tmp'].$file);
+			    	if ($date < $now - FileField::DELAY_OLDFILE) {
+			    		unlink (FileField::PATH_UPLOAD['tmp'].$file);
 			    	}
 			    }
 			}

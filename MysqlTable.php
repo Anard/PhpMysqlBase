@@ -285,16 +285,8 @@ abstract class MysqlTable implements Table
 		$this->default_access = ACCESS::getKey($read_write);
 		$this->idLoad = $this->Defaults['id'];
 		foreach ($this->Fields as $field => $content) {
-			switch ($content->Type) {
-				// set parent item
-				case TYPE::PARENT:	$this->parentItem = $field; break;
-				// add preloader field
-				// have to be plced before, so checked first when validating
-				case TYPE::FILE:
-					$preload = new Field (TYPE::PRELOAD, $this->Fields[$field]->Name);
-					$this->Fields = array( UI_MysqlTable::preloadFileName($field) => $preload )+$this->Fields;
-				default: break;
-			}
+			if ($content->Type == TYPE::PARENT)
+				$this->parentItem = $field; break;
 		}
 		
 		if (isset($_GET[$loadGetVar]))
@@ -741,7 +733,6 @@ abstract class MysqlTable implements Table
 			case TYPE::COLOR:	return ((preg_match ('/^(#[0-9a-fA-F]{6})|(rgb\((\s*[01]?[0-9]?[0-9]|2[0-4][0-9]|25[0-5]\s*,){2}\s*[01]?[0-9]?[0-9]|2[0-4][0-9]|25[0-5]\s*\))$/',$value) == 1) ? SQL_ERR::OK : SQL_ERR::NOTCOLOR);
 			
 			case TYPE::FILE:	return $this->Fields[$field]->validatePostedFile ($field);
-			case TYPE::PRELOAD;	return (file_exists($value)) ? SQL_ERR::OK : SQL_ERR::FILE;
 			default:			return SQL_ERR::OK;
 		}
 	}
@@ -767,7 +758,7 @@ abstract class MysqlTable implements Table
 			
 			// search errors
 			$err = ($value != "" ? $this->isValidValue($field, $value) : SQL_ERR::OK);
-			if ($err && ($this->Fields[$field]->Type != TYPE::ID || $value > 0) && ($this->Fields[$field]->Type != TYPE::PRELOAD || $value != ''))
+			if ($err && ($this->Fields[$field]->Type != TYPE::ID || $value > 0))
 				array_push($this->Fields[$field]->Errors, $err);
 			
 			$nbErrors = sizeof($this->Fields[$field]->Errors);
@@ -784,7 +775,6 @@ abstract class MysqlTable implements Table
 						case TYPE::FILE:
 							if ($nbErrors > 0)
 								array_push ($this->Fields[$field]->Errors, SQL_ER::NEEDED);
-						case TYPE::PRELOAD: break;
 							
 						default:
 							if ($value == "" || $nbErrors > 0)
@@ -834,16 +824,9 @@ abstract class MysqlTable implements Table
 					else $validValues[$field] = password_hash ($value, PASSWORD_DEFAULT);
 					break;
 				
-				case TYPE::PRELOAD:
-					if ($nbErrors == 0 && $value != '') $validValues[$field] = $value;
-					else $validValues[$field] = '';
-					break; // and wait for checking matching file
 				case TYPE::FILE:
-					if ($nbErrors == 0 && $this->Fields[$field]->type != NULL) {
-						$validValues[$field] = $value['tmp_name'];
-						// unset preload
-						array_splice_by_key ($this->Fields, UI_MysqlTable::preloadFileName($field), 1);
-					}
+					if ($nbErrors == 0)
+						$validValues[$field] = $value['tmp_name']; // just to give a value, FileField->upload will finally upload right one
 					break;
 
 				default:
@@ -944,6 +927,12 @@ abstract class MysqlTable implements Table
 			default: break;
 		}
 		
+		// Delete linked files
+		foreach ($this->Fields as $field => $content) {
+			if ($content->Type == TYPE_FILE)
+				$content->delete($this->get_data($id, $field, ACCESS::WRITE));
+		}
+		
 		// Finally delete entry
 		$reponse = $this->bdd->prepare('DELETE FROM '.$this->Table.' WHERE id = :id');
 		$reponse->bindParam('id', $id, PDO::PARAM_INT);
@@ -974,14 +963,9 @@ abstract class MysqlTable implements Table
 		if ($value == $this->get_data(['id'], $field)) return false;
 		if ($type == TYPE::PASSWD && $value == "") return false;
 		
-		if ($type == TYPE::FILE || $type == TYPE::PRELOAD) {
-			if ($type == TYPE::PRELOAD && $value != "") {
-				$fileField = UI_MysqlTable::removePreloadFileName($field);
-				$value = $this->Fields[$fileField]->upload($this->Table, $field);
-			}
-			else $value = $this->Fields[$field]->upload($this->Table, $field);
+		if ($type == TYPE::FILE) {
+			$value = $this->Fields[$field]->upload($this->Table, $field);
 			if (!$value) return false;
-			if ($type == TYPE::PRELOAD) $field = $fileField;
 		}
 		
 		$reponse = $this->bdd->prepare('UPDATE '.$this->Table.' SET '.$field.' = :value WHERE id = :id');
@@ -1022,14 +1006,9 @@ abstract class MysqlTable implements Table
 			if (sizeof($this->Fields[$field]->Errors) > 0)
 				return false;
 
-			if ($type == TYPE::FILE || $type == TYPE::PRELOAD) {
-				if ($type == TYPE::PRELOAD && $value != '') {
-					$fileField = UI_MysqlTable::removePreloadFileName($field);
-					$value = $this->Fields[$fileField]->upload($this->Table, $field);
-				}
-				else $value = $this->Fields[$field]->upload($this->Table, $field);
-				if (!$value) return false;
-				if ($type == TYPE::PRELOAD) $field = $fileField;
+			if ($type == TYPE::FILE) {
+				$value = $this->Fields[$field]->upload($this->Table, $field);
+				if (!$value) $value == "";
 			}
 		
 			$echoValues[$field] = ':'.strtolower($field);
