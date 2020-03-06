@@ -244,8 +244,6 @@ abstract class MysqlTable implements Table
 	protected $FileMgmt = array();	// File management
 	// readable au niveau supérieur (getter)
 	protected $table;				// name of Mysql base table
-	protected $idLoad;				// Page loaded id
-	protected $Defaults;			// defaults fields values
 	private	$Ordering;				// default ordering of data
 	private $Limiting;				// default exclusion when getting data
 	
@@ -283,9 +281,8 @@ abstract class MysqlTable implements Table
 	function _constructExit ($read_write = ACCESS::__default, $loadGetVar = 'idload') {
 		if (!array_key_exists('id', $this->Fields)) return SQL_ERR::KO;
 		$this->default_access = ACCESS::getKey($read_write);
-		$this->idLoad = $this->Defaults['id'];
-		foreach ($this->Fields as $field => $content) {
-			if ($content->Type == TYPE::PARENT)
+		foreach ($this->Fields as $field => $Field) {
+			if ($Field->Type == TYPE::PARENT)
 				$this->parentItem = $field; break;
 		}
 		
@@ -314,9 +311,11 @@ abstract class MysqlTable implements Table
 
 	// GETTERS
 	public function print_errors() {
-		$data = $this->get_data ($this->idLoad);
-		foreach ($this->Fields as $content)
-			SQL_ERR::print_errors ($content->Errors, $data, $content->Name);
+		$data = [];
+		foreach ($this->Fields as $field => $Field)
+			$data[$field] = $Field->value;
+		foreach ($this->Fields as $Field)
+			SQL_ERR::print_errors ($Field->Errors, $data, $Field->Name);
 		
 		return false;
 	}
@@ -328,24 +327,28 @@ abstract class MysqlTable implements Table
 
 	// Get defaults
 	public function getDefaults($fields = GET::ALL) {
-		if ($fields == GET::ALL)
-			return $this->secure_data($this->Defaults);
-		elseif (is_array($fields)) {
+		if ($fields == GET::ALL) {
+			$ret = [];
+			foreach ($this->Fields as $field => $Field)
+				$ret[$field] = $Field->Default;
+			return $this->secure_data($ret);
+		}
+		if (is_array($fields)) {
 			$ret = [];
 			foreach ($fields as $field) {
 				if (!array_key_exists ($field, $this->Fields)) continue;
-				array_push ($ret, $this->Defaults[$field]);
+				$ret[$field] = $this->Fields[$field]->Default;
 			}
 			return $this->secure_data($ret);
 		}
 		elseif (array_key_exists ($fields, $this->Fields))
-			return $this->_secure_data($this->Defaults[$fields], $this->Fields[$fields]->Type);
+			return ($this->_secure_data($this->Fields[$field]->Default, $this->Fields[$fields]->Type));
 		else return NULL;
 	}
 
 	// Get current ID
 	public function getIdLoad() {
-		return $this->idLoad;
+		return $this->Fields['id']->value;
 	}
 	
 	// Is default access ACCESS::WRITE ?
@@ -474,7 +477,7 @@ abstract class MysqlTable implements Table
 				if ($this->Parent !== NULL) {
 					if ($this->Limiting != "") $limit = ' AND '.$this->Limiting;
 					$reponse = $this->bdd->prepare('SELECT '.$fields.' FROM '.$this->Table.' WHERE '.$this->parentItem.' = :parent'.$limit.$this->getOrdering());
-					$reponse->bindParam('parent', $this->Parent->idLoad, PDO::PARAM_INT);
+					$reponse->bindParam('parent', $this->Parent->Fieds['id']->value, PDO::PARAM_INT);
 					$reponse->execute();
 					$donnees = $reponse->fetchAll();
 					$reponse->closeCursor();
@@ -575,8 +578,8 @@ abstract class MysqlTable implements Table
 					$donnees['listData'] = array(
 						'table' => $this->table,
 						'listName' => $this->Fields['id']->Name,
-						'defaultId' => $this->Defaults['id'],
-						'currentId' => $this->idLoad,
+						'defaultId' => $this->Fields['id']->Default,
+						'currentId' => $this->Fields['id']->value,
 						'first' => $first,
 						'nombre' => $nombre,
 						'prec' => $prec,
@@ -604,16 +607,16 @@ abstract class MysqlTable implements Table
 			default:
 				if (!$this->rights_control($read_write, $get)) return NULL;
 				if (!$this->is_data($get)) {
-					if ($fields == GET::ALL) $donnees = $this->Defaults;
+					if ($fields == GET::ALL) $donnees = $this->getDefaults();
 					elseif (isset($arrayFields)) {
-						foreach ($this->Defaults as $field => $value) {
+						foreach ($this->getDefaults() as $field => $value) {
 							if (in_array($field, $arrayFields))
 								array_push ($donnees, [$field => $value]);
 						}
 						
 					}
 					elseif (array_key_exists($fields, $this->Fields))
-						$donnees = $this->Defaults[$fields];
+						$donnees = $this->getDefaults([$fields]);
 					else return NULL;
 					// if get isn't null and Parent exists, set parent id if known
 					if ($this->Parent !== NULL) {
@@ -820,7 +823,7 @@ abstract class MysqlTable implements Table
 					
 				case TYPE::PASSWD:
 					if ($value == "" || ($nbErrors > 0 && ($nbErrors > 1 || $this->Fields[$field]->Errors[0] != SQL_ERR::NEEDED)))
-						$validValues[$field] = $this->Defaults[$field];
+						$validValues[$field] = $this->getDefaults([$field]);
 					else $validValues[$field] = password_hash ($value, PASSWORD_DEFAULT);
 					break;
 				
@@ -831,7 +834,7 @@ abstract class MysqlTable implements Table
 
 				default:
 					if ($nbErrors > 0 && ($nbErrors > 1 || $this->Fields[$field]->Errors[0] != SQL_ERR::NEEDED))
-						$validValues[$field] = $this->Defaults[$field];
+						$validValues[$field] = $this->getDefaults([$field]);
 					else $validValues[$field] = $value;
 					break;
 			}
@@ -842,12 +845,12 @@ abstract class MysqlTable implements Table
 	
 	// SETTERS
 	// Définition des types
-	protected function set_field ($field, $type, $name = '', $required = false, $unique = false) {
+	protected function set_field ($field, $type, $name = '', $default = NULL, $required = false, $unique = false) {
 		if (!array_key_exists($field, $this->Fields)) return false;
 
-		if ($type == TYPE::ID || $type == TYPE::PARENT) $required = true;
+		$default = $this->_secure_data ($default, $type);
 		
-		return ($this->Fields[$field] = new Field($type, $name, $required, $unique));
+		return ($this->Fields[$field] = new Field($type, $name, $default, $required, $unique));
 	}
 	
 	protected function _record_changes ($validatedValues) {
@@ -928,9 +931,9 @@ abstract class MysqlTable implements Table
 		}
 		
 		// Delete linked files
-		foreach ($this->Fields as $field => $content) {
-			if ($content->Type == TYPE_FILE)
-				$content->delete($this->get_data($id, $field, ACCESS::WRITE));
+		foreach ($this->Fields as $field => $Field) {
+			if ($Field->Type == TYPE_FILE)
+				$Field->delete($this->get_data($id, $field, ACCESS::WRITE));
 		}
 		
 		// Finally delete entry
@@ -960,7 +963,7 @@ abstract class MysqlTable implements Table
 			return false;
 		}
 		if (sizeof($this->Fields[$field]->Errors) > 0) return false;
-		if ($value == $this->get_data(['id'], $field)) return false;
+		if ($value == $this->Fields[$field]->value) return false;
 		if ($type == TYPE::PASSWD && $value == "") return false;
 		
 		if ($type == TYPE::FILE) {
@@ -1139,12 +1142,15 @@ abstract class MysqlTable implements Table
 		if (!ACCESS::hasKey($read_write)) return SQL_ERR::ACCESS;
 		// If Parent is defined, loadid = NULL if working on parent, loadid = 0 if working on child, these 2 values are valid even if no data
 		if ($this->Parent !== NULL && ($loadid === NULL || $loadid == 0))
-			$this->idLoad = $loadid;
+			$this->Fields['id']->value = $loadid;
 		
 		elseif ($loadid && is_numeric($loadid) && $loadid > 0) {
 			if ($this->is_data($loadid)) {
-				if ($this->rights_control($read_write, $loadid))
-					$this->idLoad = $loadid;
+				if ($this->rights_control($read_write, $loadid)) {
+					$data = $this->get_data ($loadid, GET::ALL, $read_write);
+					foreach ($this->Fields as $field => $Field)
+						$Field->value = $data[$field];
+				}
 				else {
 					if (!headers_sent()) header ('HTTP/1.1 401 Unauthorized');
 					array_push ($this->Fields['id']->Errors, SQL_ERR::ACCESS);
@@ -1153,10 +1159,9 @@ abstract class MysqlTable implements Table
 			}
 		}
 
-		if ($this->Parent === NULL || !is_numeric($this->idLoad) || $this->idLoad == 0) return SQL_ERR::OK;
+		if ($this->Parent === NULL || !is_numeric($this->getIdLoad()) || $this->idLoad == 0) return SQL_ERR::OK;
 		// Load parent
 		return $this->Parent->load_id($this->get_data($this->idLoad, $this->parentItem, $read_write), $read_write);
-		
 	}
 }
 

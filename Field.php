@@ -32,16 +32,27 @@ class Field
 	public $Required = false;	// true, false or number if one of corresponding number is required
 	public $Unique = false;
 	public $Errors = array();
+	public $Default = NULL;
+	public $value = NULL;		// value is loaded from DB
 	
-	function __construct ($type = TYPE::__default, $name = '', $required = false, $unique = false) {
+	function __construct ($type = TYPE::__default, $name = '', $default = NULL, $required = false, $unique = false) {
+		$this->Type = TYPE::getKey($type);
+		switch ($this->Type) {
+			case TYPE::ID:
+			case TYPE::PARENT:
+				$required = true;
+				
+			default: break;
+		}
 		if (is_bool($required) || is_numeric($required))
 			$this->Required = $required;
 		else return NULL;
 		if (is_bool($unique))
 			$this->Unique = $unique;
 		else return NULL;
-		$this->Type = TYPE::getKey($type);
-		$this->Name = $name;
+
+		$this->Name = DataManagement::secureText($name);
+		$this->Default = $default;
 	}
 }
 ?>
