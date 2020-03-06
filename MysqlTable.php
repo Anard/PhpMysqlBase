@@ -12,8 +12,8 @@ function array_splice_by_key (&$array, $key, $length='ALL', $replacement=array()
 
 // BASE CLASS FOR MYSQL TABLES, have to be extended at least by BASE_ExtendTable
 require_once ('Session.php');
-	require_once ('DataManagement.php');
-require_once ('FileHandling.php');
+require_once ('DataManagement.php');
+require_once ('FileField.php');
 
 // ----------- GLOBAL Table INTERFACE to implement in child classes ------------
 interface Table {
@@ -172,7 +172,7 @@ class SQL_ERR extends ERR {
 					break;
 					
 				case self::FILE:
-					if (FileHandling::print_errors ([$error], $data, $rpltStr) !== false) return true;
+					if (FILE_ERR::print_errors ([$error], $data, $rpltStr) !== false) return true;
 					else break;
 				
 				default:
@@ -1192,15 +1192,6 @@ abstract class UI_MysqlTable implements UI_Table
 
 	// prevent instanciation
     function __construct() { }
-
-	// GENERICS
-	// return preload File field name
-	public static function preloadFileName ($field) {
-		return 'preload_'.$field;
-	}
-	public static function removePreloadfileName ($field) {
-		return str_replace ('preload_', '', $field);
-	} 
 	
 	// SPECIFICS
 	// Draw Delete form

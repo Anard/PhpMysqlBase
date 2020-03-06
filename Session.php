@@ -476,7 +476,7 @@ final class SessionManagement implements Session
 	}
 	
 	private function cleanTempDir () {
-		require_once ('../ClassesBase/FileHandling.php');
+		require_once ('../ClassesBase/FileField.php');
 		$now = time();
 		if ($dossier = opendir (File::PATH_UPLOAD['tmp'])) {
 			while (false !== ($file = readdir($dossier))) {

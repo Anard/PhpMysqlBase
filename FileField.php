@@ -128,7 +128,8 @@ class File extends Field implements FileInterface {
 	public $Types = [ FILE_TYPE::__default ];
 	public $MaxSize;	// Taille max des fichiers
 	public $type = FILE_TYPE::__default;
-	private $path;
+	// Internal preload Field
+	private $Preload;
 	
 	// Construct : list of supported types, maxSize (Mo)
 	function __construct ($name = '', $okTypes = [], $maxSize, $required = false, $unique = false) {
@@ -141,10 +142,10 @@ class File extends Field implements FileInterface {
     	}
     	if (sizeof ($this->Types) == 1) return FILE_ERR::KO;
     	// delete FILE_TYPE::__default value
-    	else array_shift($this->Types); 				
-		
+    	else array_shift($this->Types);
 		
 		if (!parent::__construct(TYPE::FILE, $name, $required, $unique)) return NULL;
+		$this->Preload = new Field (TYPE::PRELOAD, $this->preloadFileName());
 	}
 	
 	// ------- Interface Methods ---------
@@ -235,6 +236,13 @@ class File extends Field implements FileInterface {
 	}
 	
 	// PRIVATE
+	//Getters
+	// return preload File field name
+	private function preloadFileName () {
+		return 'preload_'.$this->Name;
+	}
+	
+	// Setters
 	// Validate file source and save data
 	private function validateFileData ($src) {
 		if (!file_exists($src)) return FILE_ERR::NOFILE;
