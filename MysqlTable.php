@@ -834,8 +834,22 @@ abstract class MysqlTable implements Table
 	// Définition des types
 	protected function set_field ($field, $type, $name = '', $default = NULL, $required = false, $unique = false) {
 		if (!array_key_exists($field, $this->Fields)) return false;
-
-		$default = $this->_secure_data ($default, $type);
+		if ($default == NULL) {
+			switch ($this->Fields[$field]->Type) {
+				case TYPE::ID: break;
+				case TYPE::PARENT:
+					$default = $this->Parent->getDefaults('id');
+					$name = $this->Parent->Fields['id']->Name;
+					break;
+				case TYPE::COLOR:
+					DataManagement::randomColor(); break;
+				case TYPE::NUM:
+					$default = 0; break;
+				default:
+					$default = ""; break;
+			}
+		}
+		else $default = $this->_secure_data ($default, $type);
 		
 		return ($this->Fields[$field] = new Field($type, $name, $default, $required, $unique));
 	}
@@ -939,8 +953,8 @@ abstract class MysqlTable implements Table
 	
 	// Update field in DB, return field as been modified
 	protected function update_field ($id, $field, $value="") {
-		$type = $this->Fields[$field]->Type;
 		if (!array_key_exists($field, $this->Fields)) return false;
+		$type = $this->Fields[$field]->Type;
 		if (!$this->rights_control(ACCESS::WRITE, $id)) {
 			array_push ($this->Fields['id']->Errors, SQL_ERR::ACCESS);
 			return false;
@@ -950,7 +964,8 @@ abstract class MysqlTable implements Table
 			return false;
 		}
 		if (sizeof($this->Fields[$field]->Errors) > 0) return false;
-		if ($value == $this->Fields[$field]->value) return false;
+		$curValue = $this->get_data ($id, $field);
+		if ($value == $curValue) return false;
 		if ($type == TYPE::PASSWD && $value == "") return false;
 		
 		if ($type == TYPE::FILE) {

@@ -40,13 +40,10 @@ final class "Class"Table extends MysqlTable implements "Class"
 		$this->rights[ACCESS::READ] = "READ ACCESS";
 		$this->rights[ACCESS::WRITE] = "WRITE ACCESS";
 		// Init fields
-		$this->set_field('id', TYPE::ID, 'Nom');
-		$this->set_field('Field', "TYPE", 'nom dans les erreurs', "required", "unique");
-		// Init consts
-		$this->Defaults = array(
-			"id" => 0,
-			"Field" => "DEFAULT VALUE"
-		);
+		$this->set_field('id', TYPE::ID, 'Name', 0);
+		// for child's class, id = NULL means we are working on parent, id = 0 if we are working on child
+		$this->set_field('id_parent', TYPE::PARENT);
+		$this->set_field('Field', "TYPE", 'name in print_errors functions', "default value", required", "unique");
 		
 		return parent::_constructExit($read_write, "LOAD_GET_VARIABLE_NAME (=idload)");
 	}
