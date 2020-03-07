@@ -896,8 +896,6 @@ abstract class MysqlTable implements Table
 		if (sizeof($this->Fields['id']->Errors) > 0)
 			return false;
 
-		print_r ($fields);
-		
 		$echoValues = [];
 		foreach ($fields as $field => $value) {
 			$type = $this->Fields[$field]->Type;

@@ -198,7 +198,6 @@ class FileField extends Field implements FileInterface {
 		// Before upload, data should have been validated. If we use preloaded file, $_FILES[$field] have been unset;
 		// ever uploaded in temp dir
 		if (!isset($_FILES[$field])) {
-			echo print_r ($table); echo '<br />'; print_r ($field); echo '<br />'; print_r ($file); echo '<br />';
 			if (!isset($_POST[$this->Preload->Name]) || $_POST[$this->Preload->Name] == '')
 				return NULL;
 			else {
