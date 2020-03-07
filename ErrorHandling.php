@@ -1,17 +1,14 @@
 <?php
 require_once ('Generic.php');
 
+// ---------- BASE Error's CLASS -----------
 class ERR extends ExtdEnum
 {
 	// initial
 	const __default = self::OK;
 	const OK =		false;
 	const KO =		true;
-	
-	// std errors
-	const UNKNOWN =	1;
-	const ACCESS =	2;
-	
+		
 	// Remplacement de champs dans les textes
    	// Syntaxe : [...] __Field_Name|Default-Value__ [...]
 	public static function replaceFields ($text, $data = []) {
@@ -29,21 +26,19 @@ class ERR extends ExtdEnum
 		return $text;
 	}
 
-	// Print errors
-	public static function print_errors ($Error, $data = [], $rplmtStr = '') {
-		switch ($Error) {
+	// Print error
+	// For each case, return false to continue writing errors or true to stop printing
+	public static function print_error ($error, $rplmtStr = '', $data = []) {
+		switch ($error) {
 			case self::UNKNOWN:
 				echo '<h3 class="alert">';
 				echo self::replaceFields($rplmtStr, $data);
 				echo ' introuvable</h3>';
 				return true;	// stop
-			case self::ACCESS:
-				echo '<h3 class="alert">Vous n\'avez pas les droits requis pour accéder à cette ressource</h3>';
-				return true;
 								
 			case self::OK: break;
 			default:
-				echo '<h3 class="alert">Erreur(s) inconnue(s) <span class="reduit">('.$Error.')</span></h3>';
+				echo '<h3 class="alert">Erreur(s) inconnue(s) <span class="reduit">('.error.')</span></h3>';
 				break;
 		}
 

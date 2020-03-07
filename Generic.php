@@ -1,4 +1,6 @@
 <?php
+// Simulate SplEnum if doesn't exist
+// Extends SplEnum for having some basic methods
 if (!class_exists('SplEnum')) {
 	class SplEnum
 	{
@@ -26,7 +28,6 @@ if (!class_exists('SplEnum')) {
 	    }
     }
 }
-
 
 class ExtdEnum extends SplEnum
 {

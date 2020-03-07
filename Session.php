@@ -2,78 +2,7 @@
 require_once ('ErrorHandling.php');
 require_once ('DataManagement.php');
 	
-// ERRORS
-class SESS_ERR extends ERR {
-	// session
-	const LOGIN =	10;
-	const PASS =	11;
-	const EXPIRE =	12;
-	const BANNED =	20;
-	const COOKIE =	21;
-	
-	// Print errors
-	public static function print_errors ($Errors, $data = [], $rplmtStr = 'Utilisateur') {
-		// Errors contiennt toutes les erreurs de session
-		foreach ($Errors as $error) {
-			switch ($error) {
-				case self::LOGIN:
-					echo '<h3 class="alert">Membre inconnu</h3>';
-					break;
-				case self::PASS:
-					echo '<h3 class="alert">Mot de passe erroné</h3>';
-					break;
-				case self::EXPIRE:
-					echo '<h3 class="alert">Votre session a expiré</h3>';
-					echo '<p class="alert">Meci de bien vouloir vous reconnecter.</p>';
-					break;
-				case self::BANNED:
-					echo '<h3 class="alert">Votre adresse IP est bannie</h3>';
-					echo '<p class="alert">En raison d\'une activité suspecte, votre adresse a été bannie du serveur pour 24 heures. Revenez plus tard ou contactez l\'administrateur pour plus d\'informations.</p>';
-					return true;
-				case self::COOKIE:
-					echo '<h3 class="alert">Merci d\'autoriser les "cookies" pour ce site</h3>';
-					echo '<p class="alert">Les cookies enregistrent une partie de vos préférences de navigation sur votre ordinateur. Ils sont nécessaires au fonctionnement de cette application et n\'enregistrent aucune donnée personnelle. Ils seront immédiatement supprimés lors de votre déconnexion</p>';
-					break;
-					
-				default:
-   					if (parent::print_errors ($error, $data, $rplmtStr) !== false) return true;
-   					else break;
-			}
-		}
-		return false;
-	}
-}
-
-// ECHECS
-abstract class ECHEC extends ExtdEnum {
-	const __default = self::NONE;
-	const NONE =	0;
-	const COOKIE =	1;
-	const PASSWD =	2;	
-}
-
-// COOKIES
-abstract class TICKET extends ExtdEnum {
-	// Session's ticket
-	const SESSION = [	'name' =>	'passwd'
-					]; 
-	// Cookie's ticket
-	const COOKIE = [	'name' =>	'crud',
-						'expire' =>	(20 * 60), // 20 min
-						'size' =>	10	// pass lenght
-					];
-}
-
-// PREFERENCES
-abstract class PREFS extends ExtdEnum {
-	// Apercu bb code à la frappe
-	const APERCU_BB = [	'name' =>		'bbLive',
-						'expire' =>		(24 * 3600), // 1 day
-						'default' =>	true
-					]; 
-}
-
-// INTERFACE
+// INTERFACE for Session Management
 interface Session {
 	// CONSTANTS
 	// Bannisseement
@@ -113,7 +42,75 @@ interface Session {
 	public function freeIp($db, $ip, $type);
 }
 
-// FINAL CLASS SessionManagement
+// ERRORS
+class SESS_ERR extends ERR {
+	// session
+	const UNKNOWN =	10;
+	const PASS =	11;
+	const EXPIRE =	12;
+	const BANNED =	20;
+	const COOKIE =	21;
+	
+	// Print error
+	public static function print_error ($error, $rplmtStr = 'Utilisateur', $data = []) {
+		switch ($error) {
+			case self::UNKNOWN:
+				echo '<h3 class="alert">Membre inconnu</h3>';
+				break;
+			case self::PASS:
+				echo '<h3 class="alert">Mot de passe erroné</h3>';
+				break;
+			case self::EXPIRE:
+				echo '<h3 class="alert">Votre session a expiré</h3>';
+				echo '<p class="alert">Meci de bien vouloir vous reconnecter.</p>';
+				break;
+			case self::BANNED:
+				echo '<h3 class="alert">Votre adresse IP est bannie</h3>';
+				echo '<p class="alert">En raison d\'une activité suspecte, votre adresse a été bannie du serveur pour 24 heures. Revenez plus tard ou contactez l\'administrateur pour plus d\'informations.</p>';
+				return true;
+			case self::COOKIE:
+				echo '<h3 class="alert">Merci d\'autoriser les "cookies" pour ce site</h3>';
+				echo '<p class="alert">Les cookies enregistrent une partie de vos préférences de navigation sur votre ordinateur. Ils sont nécessaires au fonctionnement de cette application et n\'enregistrent aucune donnée personnelle. Ils seront immédiatement supprimés lors de votre déconnexion</p>';
+				break;
+				
+			default:
+				if (parent::print_error ($error, $rplmtStr, $data) !== false) return true;
+				else break;
+		}
+		return false;
+	}
+}
+
+// ECHECS
+abstract class ECHEC extends ExtdEnum {
+	const __default = self::NONE;
+	const NONE =	0;
+	const COOKIE =	1;
+	const PASSWD =	2;	
+}
+
+// COOKIES
+abstract class TICKET extends ExtdEnum {
+	// Session's ticket
+	const SESSION = [	'name' =>	'passwd'
+					]; 
+	// Cookie's ticket
+	const COOKIE = [	'name' =>	'crud',
+						'expire' =>	(20 * 60), // 20 min
+						'size' =>	10	// pass lenght
+					];
+}
+
+// PREFERENCES
+abstract class PREFS extends ExtdEnum {
+	// Apercu bb code à la frappe
+	const APERCU_BB = [	'name' =>		'bbLive',
+						'expire' =>		(24 * 3600), // 1 day
+						'default' =>	true
+					]; 
+}
+	
+// --------- FINAL CLASS SessionManagement ----------- //
 final class SessionManagement implements Session
 {
 	// Properties
@@ -140,7 +137,7 @@ final class SessionManagement implements Session
 	}
 	
 	// ------------ Default Session methods ---------------
-	// Static methods
+	// STATIC
 	// $size : longueur du mot passe voulue
 	public static function generatePasswd($size = self::DEFAULT_COOKSIZE)
 	{
@@ -211,7 +208,10 @@ final class SessionManagement implements Session
 
 	// PUBLIC
 	public function print_errors() {
-		return SESS_ERR::print_errors($this->Errors);
+		foreach ($this->Errors as $error) {
+			if (SESS_ERR::print_error ($error) !== false) return true;
+		}
+		return false;
 	}
 	
 	// Try to start session
@@ -256,8 +256,8 @@ final class SessionManagement implements Session
 				$bdd = NULL;
 				session_destroy();
 		    	if ($target != self::ADMIN_HOME)
-		    		$this->jumpToTarget('index.php?error='.SESS_ERR::LOGIN.'&goto='.$target);
-				else $this->jumpToTarget('index.php?error='.SESS_ERR::LOGIN);
+		    		$this->jumpToTarget('index.php?error='.SESS_ERR::UNKNOWN.'&goto='.$target);
+				else $this->jumpToTarget('index.php?error='.SESS_ERR::UNKNOWN);
 				return false;
 			}
 			else {

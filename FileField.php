@@ -1,6 +1,7 @@
 <?php
 require_once ('Field.php');
 
+// INTERFACE for File SQL fields
 interface FileInterface {
 	// STATIC
 	// Get preload file name
@@ -25,44 +26,43 @@ interface UI_FileInterface {
 	public static function draw_fieldset ($field, $table, $maxSize, $image = "");
 }
 
-class FILE_ERR extends ERR {
+// ERRORS
+class FILE_ERR extends FIELD_ERR {
 	const NOFILE =	100;
 	const SIZE =	101;
 	const TYPE =	102;
 	const UPLOAD =	110;
 	
-	// Print errors
-	public static function print_errors ($Errors, $data = [], $rplmtStr = '') // $$data is from getFileInfo()
+	// Print error
+	public static function print_error ($error, $rplmtStr = '', $data = []) // $data is from getFileInfo()
 	{
-		// $Errors contient toutes les erreurs du champ
-		foreach ($Errors as $error) {
-			switch ($error) {
-				case self::NOFILE:
-					echo '<h3 class="alert">Le fichier ';
-					self::replaceFields ('__path|choisi__', $data);
-					echo ' est introuvable.</h3>';
-					break;
-				case self::SIZE:
-					echo '<h3 class="alert">Votre fichier est trop volumineux</h3>';
-					echo '<p class="alert">Merci de respecter la limite des '.($data['size'] / 1000000).'Mo par fichier.</p>';
-					break;
-				case self::TYPE:
-					echo '<h3 class="alert">Votre fichier est de type incorrect</h3>';
-					echo '<p class="alert">Merci de choisir un fichier parmi les formats supportés : '.$data['type'].'</p>';
-					break;
-				case self::UPLOAD:
-					echo '<h3 class="alert">Un erreur est survenue pendant le téléchargement de votre fichier</h3>';
-					echo '<p class="alert">Merci de bien vouloir réessayer plus tard.</p>';
-					break;
-				
-				default:
-					return (parent::print_errors ($error, $data) !== false);
-			}
+		switch ($error) {
+			case self::NOFILE:
+				echo '<h3 class="alert">Le fichier ';
+				self::replaceFields ('__path|choisi__', $data);
+				echo ' est introuvable.</h3>';
+				break;
+			case self::SIZE:
+				echo '<h3 class="alert">Votre fichier est trop volumineux</h3>';
+				echo '<p class="alert">Merci de respecter la limite des '.($data['size'] / 1000000).'Mo par fichier.</p>';
+				break;
+			case self::TYPE:
+				echo '<h3 class="alert">Votre fichier est de type incorrect</h3>';
+				echo '<p class="alert">Merci de choisir un fichier parmi les formats supportés : '.$data['type'].'</p>';
+				break;
+			case self::UPLOAD:
+				echo '<h3 class="alert">Un erreur est survenue pendant le téléchargement de votre fichier</h3>';
+				echo '<p class="alert">Merci de bien vouloir réessayer plus tard.</p>';
+				break;
+			
+			default:
+				return (parent::print_error ($error, $rplmtStr, $data));
 		}
 		return false;
 	}
 }
 
+// File TYPES
 class FILE_TYPE extends ExtdEnum {
 	const __default = NULL;
 	
@@ -72,6 +72,7 @@ class FILE_TYPE extends ExtdEnum {
 	const PDF = ['pdf'];
 }
 
+// ---------- CLASS FILE_FIELD ----------- //
 class FileField extends Field implements FileInterface {
 
 	// Constants
@@ -131,14 +132,6 @@ class FileField extends Field implements FileInterface {
 		if ($name != self::preloadFileName($name)) $this->Preload = new Field (TYPE::TEXT, self::preloadFileName($name), '');
 	}
 	
-	//DEEBUUG///
-	
-	public function print_preloaded () {
-		return (print_r($this->Preload));
-		
-		
-	}
-	
 	// ------- Interface Methods ---------
 	// STATIC
 	// return preload File field name
@@ -147,9 +140,12 @@ class FileField extends Field implements FileInterface {
 	}
 
 	// PUBLIC	
-	public function print_errors() {
-		foreach ($this->Errors as &$Error)
-			FILE_ERR::print_errors($this->Errors, $data);
+	public function print_errors($data = []) {
+		$data = array_merge ($data, $this->getFileInfo());
+		foreach ($this->Errors as $error) {
+			if (FILE_ERR::print_error($error, $this->Name, $data) !== false) return true;
+		}
+		return false;
 	}
 	
 	// Getters
@@ -465,6 +461,7 @@ class FileField extends Field implements FileInterface {
 	}
 }
 
+// ---------- UI CLASS for File Fields ---------- //
 class UI_File implements UI_FileInterface {
 	// prevent instanciation
 	function construct() { }

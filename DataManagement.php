@@ -1,4 +1,5 @@
 <?php
+// STATIC basic functions for Data Management
 class DataManagement {
 	//prevent instanciation
 	function ___construct () { }

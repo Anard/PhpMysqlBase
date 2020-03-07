@@ -1,26 +1,14 @@
 <?php
-function array_splice_by_key (&$array, $key, $length='ALL', $replacement=array()) {
-	if (!is_array($array)) return false;
-	if ($length == 'ALL') $length = count($array);
-	if (!is_numeric($length)) return false;
-
-	$pos = array_search ($key, array_keys($array), true);
-	if ($pos === false) return $array;
-	
-	return array_splice ($array, $pos, $length, $replacement);
-}
-
-// BASE CLASS FOR MYSQL TABLES, have to be extended at least by BASE_ExtendTable
 require_once ('Session.php');
 require_once ('DataManagement.php');
 require_once ('FileField.php');
 
-// ----------- GLOBAL Table INTERFACE to implement in child classes ------------
+// ----------- GLOBAL Mysql Table INTERFACE to implement in child classes ------------
 interface Table {
 	// Set defaults and table
-	// Retourne SQL_ERR::RIGHTS si on n'a pas les droits sur l'idLoad
 	function __construct();
 
+	// PUBLIC
 	// GETTERS
 	public function print_errors();
 	// Get table short name
@@ -59,123 +47,45 @@ interface UI_Table {
 class SQL_ERR extends ERR {
 	const INVALID =	-1;	// generic invalid (should not happen as normally ever checked (see update & insert on isValidField))
 	
-	const NOTNUM =	10;
-	const NOTMAIL =	11;
-	const NOTTEL =	12;
-	const NOTDATE =	13;
-	const NOTHOUR =	14;
-	const NOTLINK =	15;
-	const NOTCOLOR = 16;
-	
-	// required field
-	const NEEDED =	20;
-	const NEED1 =	21;	// 1 == true
-	const NEED2 =	22;
-	const NEED3 =	23;
-	const NEED4 =	24;
-	const NEED5 =	25;
-	const NEED6 =	26;
-	const NEED7 =	27;
-	const NEED8 =	28;
-	const NEED9 =	29;
-		
-	// other field errors
-	const CORRESPWD =	30;
-	const EXISTS =		31;
-	const SENDMAIL =	32;
-	const FILE =		33;
-	
+	// generics
+	const ACCESS =		10;
+	const SENDMAIL =	11;
+
 	// updating BDD
-	const INSERT =	40;
-	const UPDATE =	41;
-	const DELETE =	42;
+	const INSERT =	20;
+	const UPDATE =	21;
+	const DELETE =	22;
 	
 	// Print errors
-	public static function print_errors ($Errors, $data = [], $rplmtStr = '') {
-		foreach ($Errors as $error) {
-			switch ($error) {
-				case self::NOTNUM:
-					echo '<h3 class="alert">Le champ ';
-					echo self::replaceFields($rplmtStr, $data);
-					echo ' doit être numérique</h3>';
-					break;
-				case self::NOTMAIL:
-					echo '<h3 class="alert">Votre adresse mail est invalide</h3>';
-					break;
-				case self::NOTTEL:
-					echo '<h3 class="alert">Votre numéro de téléphone est invalide</h3>';
-					echo '<p class="alert">Un numéro de téléphone doit comporter dix chiffres, séparés éventuellement par des espaces.</p>';
-					break;
-				case self::NOTDATE:
-					echo '<h3 class="alert">Date invalide</h3>';
-					echo '<p class="alert">Merci de renseigner la date au format jj/mm/aaaa</p>';
-					break;
-				case self::NOTHOUR:
-					echo '<h3 class="alert">Heure invalide</h3>';
-					echo '<p class="alert">Merci de renseigner l\'heure au format HH:MM</p>';
-					break;
-				case self::NOTLINK:
-					echo '<h3 class="alert">Lien invalide</h3>';
-					echo '<p class="alert">Le lien fourni est invalide</p>';
-					break;
+	public static function print_error ($error, $rplmtStr = '', $data = []) {
+		switch ($error) {
+			case self::ACCESS:
+				echo '<h3 class="alert">Vous n\'avez pas les droits requis pour accéder à cette ressource</h3>';
+				return true;
+			case self::SENDMAIL:
+				echo '<h3 class="alert">L\'envoi du message a échoué en raison d\'une erreur du serveur.</h3>';
+				include ('../Config/headers.php');
+				echo '<p class="centered">Merci de bien vouloir <a href="mailto:'.$emailasso.'">contacter l\'administrateur</a>.</p>';
+				break;
 				
-				case self::NEEDED:
-				case self::NEED1:	// true == 1
-					echo '<h3 class="alert">Le champ ';
-					echo self::replaceFields($rplmtStr, $data);
-					echo ' est requis</h3>';
-					break;
-				case self::NEED2:
-				case self::NEED3:
-				case self::NEED4:
-				case self::NEED5:
-				case self::NEED6:
-				case self::NEED7:
-				case self::NEED8:
-				case self::NEED9:
-					echo '<h3 class="alert">Veillez renseigner au moins un des champs ';
-					echo self::replaceFields($rplmtStr, $data);
-					echo '</h3>';
-					break;
-					
-				case self::CORRESPWD:
-					echo '<h3 class="alert">Les mots de passe ne correspondent pas</h3>';
-					break;
-				case self::EXISTS:
-					echo '<h3 class="alert">Le champ ';
-					echo self::replaceFields($rplmtStr, $data);
-					echo ' est déjà utilisé avec cette valeur.</h3>';
-					break;
-				case self::SENDMAIL:
-					echo '<h3 class="alert">L\'envoi du message a échoué en raison d\'une erreur du serveur.</h3>';
-					include ('../Config/headers.php');
-					echo '<p class="centered">Merci de bien vouloir <a href="mailto:'.$emailasso.'">contacter l\'administrateur</a>.</p>';
-					break;
-					
-				case self::INSERT:
-					echo '<h3 class="alert">Une erreur est survenue lors de la création de ';
-					echo self::replaceFields(strtolower($rplmtStr), $data);
-					echo '</span></h3>';
-					break;
-				case self::UPDATE:
-					echo '<h3 class="alert">Une erreur est survenue lors de la mise à jour de ';
-					echo self::replaceFields(strtolower($rplmtStr), $data);
-					echo '</span></h3>';
-					break;
-					case self::DELETE:
-					echo '<h3 class="alert">Une erreur est survenue lors de la suppression de ';
-					echo self::replaceFields(strtolower($rplmtStr), $data);
-					echo '</span></h3>';
-					break;
-					
-				case self::FILE:
-					if (FILE_ERR::print_errors ([$error], $data, $rpltStr) !== false) return true;
-					else break;
+			case self::INSERT:
+				echo '<h3 class="alert">Une erreur est survenue lors de la création de ';
+				echo self::replaceFields(strtolower($rplmtStr), $data);
+				echo '</span></h3>';
+				break;
+			case self::UPDATE:
+				echo '<h3 class="alert">Une erreur est survenue lors de la mise à jour de ';
+				echo self::replaceFields(strtolower($rplmtStr), $data);
+				echo '</span></h3>';
+				break;
+				case self::DELETE:
+				echo '<h3 class="alert">Une erreur est survenue lors de la suppression de ';
+				echo self::replaceFields(strtolower($rplmtStr), $data);
+				echo '</span></h3>';
+				break;
 				
-				default:
-					if (parent::print_errors ($error, $data, $rplmtStr) !== false) return true;
-					else break;
-			}
+			default:
+				return (parent::print_error ($error, $rplmtStr, $data));
 		}
 		
 		return false;
@@ -215,7 +125,7 @@ class ACCESS extends ExtdEnum {
 // Get values
 class GET extends ExtdEnum {
 	// default is ID of wanted data
-	// * value will get all in Sql requests when applied to fields
+	// '*' value will get all in Sql requests when applied to fields
 	const __default = self::ALL;
 	const ALL =		'*';
 	const LIST =	-1;
@@ -243,7 +153,10 @@ abstract class MysqlTable implements Table
 	protected $table;				// name of Mysql base table
 	private	$Ordering;				// default ordering of data
 	private $Limiting;				// default exclusion when getting data
-	
+
+	// errors
+	private $Errors = [];
+
 	// Constructor => inherit : lien vers la table héritée)
 	function _constructInit ($table, $childsTables = [], $ordering = "", $limiting = "") {
 		if ($this->Parent == NULL) {
@@ -297,13 +210,16 @@ abstract class MysqlTable implements Table
 	
 	// ------------ GLOBAL INTERFACE METHODS ----------- //
 	// GETTERS
-	public function print_errors() {
+	public function print_errors () {
 		$data = [];
-		foreach ($this->Fields as $field => $Field)
+		foreach ($this->Fields as $field => &$Field)
 			$data[$field] = $Field->value;
-		foreach ($this->Fields as $Field)
-			SQL_ERR::print_errors ($Field->Errors, $data, $Field->Name);
-		
+		foreach ($this->Errors as $error) {
+			if (SQL_ERR::print_error ($error, $this->Fields['id']->Name, $data) !== false) return true;
+		}
+		foreach ($this->Fields as &$Field) {
+			if ($Field->print_errors ($data) !== false) return true;
+		}
 		return false;
 	}
 	
@@ -704,26 +620,26 @@ abstract class MysqlTable implements Table
 
 	// Contrôle de la validité d'un champ, return error
 	protected function isValidValue ($field, $value) {
-		if (!array_key_exists($field, $this->Fields)) return SQL_ERR::KO;
+		if (!array_key_exists($field, $this->Fields)) return FIELD_ERR::KO;
 		
-		if ($this->Fields[$field]->Unique && !$this->isUnique($field, $value)) return SQL_ERR::EXISTS;
+		if ($this->Fields[$field]->Unique && !$this->isUnique($field, $value)) return FIELD_ERR::EXISTS;
 		switch ($this->Fields[$field]->Type) {
 			case TYPE::ID:
-				return ($this->is_data($value) ? SQL_ERR::OK : SQL_ERR::UNKNOWN);
+				return ($this->is_data($value) ? FIELD_ERR::OK : FIELD_ERR::UNKNOWN);
 			case TYPE::PARENT:
-				return ($this->Parent->is_data($value) ? SQL_ERR::OK : SQL_ERR::UNKNOWN);				
-			case TYPE::NUM:		return (is_numeric($value) ? SQL_ERR::OK : SQL_ERR::NOTNUM);
+				return ($this->Parent->is_data($value) ? FIELD_ERR::OK : FIELD_ERR::UNKNOWN);
+			case TYPE::NUM:		return (is_numeric($value) ? FIELD_ERR::OK : FIELD_ERR::NOTNUM);
 			
-			case TYPE::MAIL:	return (filter_var($value, FILTER_VALIDATE_EMAIL) ? SQL_ERR::OK : SQL_ERR::NOTMAIL);
-			case TYPE::TEL:		return ((preg_match ('#^[0-9]{10}$#', preg_replace ('#\s#', '', $value)) == 1) ? SQL_ERR::OK : SQL_ERR::NOTTEL);
-			case TYPE::DATE: //return ((preg_match ('#^[0-9]{2,4}-[0-9]{2}-[0-9]{2}$#', $value) == 1) ? SQL_ERR::OK : SQL_ERR::DATE);
-								return ($value !== false ? SQL_ERR::OK : SQL_ERR::NOTDATE);
-			case TYPE::HOUR:	return ((preg_match ('#^([0-1][0-9])|(2[0-3]):[0-5][0-9](:[0-5][0-9])?$#',$value) == 1) ? SQL_ERR::OK : SQL_ERR::HOUR);
-			case TYPE::LINK:	return (filter_var($value, FILTER_VALIDATE_URL) ? SQL_ERR::OK : SQL_ERR::NOTLINK);
-			case TYPE::COLOR:	return ((preg_match ('/^(#[0-9a-fA-F]{6})|(rgb\((\s*[01]?[0-9]?[0-9]|2[0-4][0-9]|25[0-5]\s*,){2}\s*[01]?[0-9]?[0-9]|2[0-4][0-9]|25[0-5]\s*\))$/',$value) == 1) ? SQL_ERR::OK : SQL_ERR::NOTCOLOR);
+			case TYPE::MAIL:	return (filter_var($value, FILTER_VALIDATE_EMAIL) ? FIELD_ERR::OK : FIELD_ERR::NOTMAIL);
+			case TYPE::TEL:		return ((preg_match ('#^[0-9]{10}$#', preg_replace ('#\s#', '', $value)) == 1) ? FIELD_ERR::OK : FIELD_ERR::NOTTEL);
+			case TYPE::DATE: //return ((preg_match ('#^[0-9]{2,4}-[0-9]{2}-[0-9]{2}$#', $value) == 1) ? FIELD_ERR::OK : FIELD_ERR::DATE);
+								return ($value !== false ? FIELD_ERR::OK : FIELD_ERR::NOTDATE);
+			case TYPE::HOUR:	return ((preg_match ('#^([0-1][0-9])|(2[0-3]):[0-5][0-9](:[0-5][0-9])?$#',$value) == 1) ? FIELD_ERR::OK : FIELD_ERR::HOUR);
+			case TYPE::LINK:	return (filter_var($value, FILTER_VALIDATE_URL) ? FIELD_ERR::OK : FIELD_ERR::NOTLINK);
+			case TYPE::COLOR:	return ((preg_match ('/^(#[0-9a-fA-F]{6})|(rgb\((\s*[01]?[0-9]?[0-9]|2[0-4][0-9]|25[0-5]\s*,){2}\s*[01]?[0-9]?[0-9]|2[0-4][0-9]|25[0-5]\s*\))$/',$value) == 1) ? FIELD_ERR::OK : FIELD_ERR::NOTCOLOR);
 			
 			case TYPE::FILE:	return $this->Fields[$field]->validatePostedFile ($field);
-			default:			return SQL_ERR::OK;
+			default:			return FIELD_ERR::OK;
 		}
 	}
 	
@@ -732,11 +648,11 @@ abstract class MysqlTable implements Table
 		if (!array_key_exists($field, $this->Fields)) return false;
 
 		switch ($this->Fields[$field]->Required) {
-			case false: return ($value == "" || $this->isValidValue ($field, $value) === SQL_ERR::OK);
-			case true: return ($value != "" && $this->isValidValue ($field, $value) === SQL_ERR::OK);
+			case false: return ($value == "" || $this->isValidValue ($field, $value) === FIELD_ERR::OK);
+			case true: return ($value != "" && $this->isValidValue ($field, $value) === FIELD_ERR::OK);
 			
 			default:
-				if ($value != "") return ($this->isValidValue ($field, $value) === SQL_ERR::OK);
+				if ($value != "") return ($this->isValidValue ($field, $value) === FIELD_ERR::OK);
 				else return $this->Fields[$field]->Required;
 		}
 	}
@@ -747,7 +663,7 @@ abstract class MysqlTable implements Table
 			if (!array_key_exists($field, $this->Fields)) continue;
 			
 			// search errors
-			$err = ($value != "" ? $this->isValidValue($field, $value) : SQL_ERR::OK);
+			$err = ($value != "" ? $this->isValidValue($field, $value) : FIELD_ERR::OK);
 			if ($err && ($this->Fields[$field]->Type != TYPE::ID || $value > 0))
 				array_push($this->Fields[$field]->Errors, $err);
 			
@@ -760,15 +676,15 @@ abstract class MysqlTable implements Table
 						case TYPE::ID: case TYPE::PARENT: break;
 						case TYPE::NUM:
 							if ($value == 0 || $nbErrors > 0)
-								array_push($this->Fields[$field]->Errors, SQL_ERR::NEEDED);
+								array_push($this->Fields[$field]->Errors, FIELD_ERR::NEEDED);
 							break;
 						case TYPE::FILE:
 							if ($nbErrors > 0)
-								array_push ($this->Fields[$field]->Errors, SQL_ER::NEEDED);
+								array_push ($this->Fields[$field]->Errors, FIELD_ERR::NEEDED);
 							
 						default:
 							if ($value == "" || $nbErrors > 0)
-								array_push($this->Fields[$field]->Errors, SQL_ERR::NEEDED);
+								array_push($this->Fields[$field]->Errors, FIELD_ERR::NEEDED);
 							break;
 					}
 					break;
@@ -792,7 +708,7 @@ abstract class MysqlTable implements Table
 			if (isset ($isSet)) {
 				foreach ($isSet as $couple => $result) {
 					if (!$result)
-						array_push ($this->Fields['id']->Errors, (SQL_ERR::NEEDED + $couple));
+						array_push ($this->Fields['id']->Errors, (FIELD_ERR::NEEDED + $couple));
 				}
 			}
 		}
@@ -809,7 +725,7 @@ abstract class MysqlTable implements Table
 					break;
 					
 				case TYPE::PASSWD:
-					if ($value == "" || ($nbErrors > 0 && ($nbErrors > 1 || $this->Fields[$field]->Errors[0] != SQL_ERR::NEEDED)))
+					if ($value == "" || ($nbErrors > 0 && ($nbErrors > 1 || $this->Fields[$field]->Errors[0] != FIELD_ERR::NEEDED)))
 						$validValues[$field] = $this->getDefaults([$field]);
 					else $validValues[$field] = password_hash ($value, PASSWORD_DEFAULT);
 					break;
@@ -820,7 +736,7 @@ abstract class MysqlTable implements Table
 					break;
 
 				default:
-					if ($nbErrors > 0 && ($nbErrors > 1 || $this->Fields[$field]->Errors[0] != SQL_ERR::NEEDED))
+					if ($nbErrors > 0 && ($nbErrors > 1 || $this->Fields[$field]->Errors[0] != FIELD_ERR::NEEDED))
 						$validValues[$field] = $this->getDefaults([$field]);
 					else $validValues[$field] = $value;
 					break;
@@ -878,7 +794,7 @@ abstract class MysqlTable implements Table
 	// Delete entry in DB (directly called from child's send_form function, after checking action)
 	protected function delete_entry ($id) {
 		if (!$this->rights_control(ACCESS::WRITE, $id)) {
-			array_push ($this->Fields['id']->Errors, SQL_ERR::ACCESS);
+			array_push ($this->Errors, SQL_ERR::ACCESS);
 			return false;
 		}
 
@@ -923,7 +839,7 @@ abstract class MysqlTable implements Table
 		$reponse->closeCursor();
 		
 		if (!$ret) {
-			array_push ($this->Fields['id']->Errors, SQL_ERR::DELETE);
+			array_push ($this->Errors, SQL_ERR::DELETE);
 			return $ret;
 		}
 
@@ -935,11 +851,11 @@ abstract class MysqlTable implements Table
 		if (!array_key_exists($field, $this->Fields)) return false;
 		$type = $this->Fields[$field]->Type;
 		if (!$this->rights_control(ACCESS::WRITE, $id)) {
-			array_push ($this->Fields['id']->Errors, SQL_ERR::ACCESS);
+			array_push ($this->Errors, SQL_ERR::ACCESS);
 			return false;
 		}
 		if (!$this->is_data($id)) {
-			array_push ($this->Fields['id']->Errors, SQL_ERR::UNKNOWN);
+			array_push ($this->Fields['id']->Errors, FIELD_ERR::UNKNOWN);
 			return false;
 		}
 		if (sizeof($this->Fields[$field]->Errors) > 0) return false;
@@ -966,7 +882,7 @@ abstract class MysqlTable implements Table
 		$ret = ($reponse->execute());
 		$reponse->closeCursor();
 		
-		if (!$ret) array_push ($this->Fields[$field]->Errors, SQL_ERR::UPDATE);
+		if (!$ret) array_push ($this->Errors, SQL_ERR::UPDATE);
 		return $ret;
 	}
 
@@ -974,7 +890,7 @@ abstract class MysqlTable implements Table
 	// Insert full entry in DB, return false or ID of created entry
 	private function insert_data ($fields) {
 		if (!$this->rights_control(ACCESS::WRITE, 0, SessionManagement::getSessId())) {
-			array_push ($this->Fields['id']->Errors, SQL_ERR::ACCESS);
+			array_push ($this->Errors, SQL_ERR::ACCESS);
 			return false;
 		}
 		if (sizeof($this->Fields['id']->Errors) > 0)
@@ -986,7 +902,7 @@ abstract class MysqlTable implements Table
 		foreach ($fields as $field => $value) {
 			$type = $this->Fields[$field]->Type;
 			if (!array_key_exists($field, $this->Fields) || $type == TYPE::ID) {
-				array_splice_by_key ($fields, $field, 1);
+				unset ($fields[$field]);
 				continue;
 			}
 			if (sizeof($this->Fields[$field]->Errors) > 0)
@@ -1018,7 +934,7 @@ abstract class MysqlTable implements Table
 		$ret = ($reponse->execute());
 		$reponse->closeCursor();
 		if (!$ret) {
-			array_push ($this->Fields['id']->Errors, SQL_ERR::INSERT);
+			array_push ($this->Errors, SQL_ERR::INSERT);
 			return false;
 		}
 		
@@ -1027,7 +943,7 @@ abstract class MysqlTable implements Table
 		$reponse->closeCursor();
 		
 		if (!$donnees) {
-			array_push ($this->Fields['id']->Errors, SQL_ERR::INSERT);
+			array_push ($this->Errors, SQL_ERR::INSERT);
 			return false;
 		}
 		// Now insert data in authorised table
@@ -1043,7 +959,7 @@ abstract class MysqlTable implements Table
 				$reponse->bindParam('userid', $userid, PDO::PARAM_INT);
 				$ret = ($reponse->execute());
 				$reponse->closeCursor();
-				if (!$ret) array_push ($this->Fields['id']->Errors, SQL_ERR::INSERT);
+				if (!$ret) array_push ($this->Errors, SQL_ERR::INSERT);
 				break;
 			default: break;
 		}
@@ -1136,7 +1052,7 @@ abstract class MysqlTable implements Table
 				}
 				else {
 					if (!headers_sent()) header ('HTTP/1.1 401 Unauthorized');
-					array_push ($this->Fields['id']->Errors, SQL_ERR::ACCESS);
+					array_push ($this->Errors, SQL_ERR::ACCESS);
 					return SQL_ERR::ACCESS;
 				}
 			}
