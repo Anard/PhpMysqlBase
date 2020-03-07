@@ -20,9 +20,6 @@ interface Table {
 	// Set defaults and table
 	// Retourne SQL_ERR::RIGHTS si on n'a pas les droits sur l'idLoad
 	function __construct();
-	
-	// STATIC (UI)
-	public static function randomColor();
 
 	// GETTERS
 	public function print_errors();
@@ -299,18 +296,6 @@ abstract class MysqlTable implements Table
 	}
 	
 	// ------------ GLOBAL INTERFACE METHODS ----------- //
-	// STATIC
-	public static function randomColor() {
-		$color = "";
-		$characters = array(0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 'a', 'b', 'c', 'd', 'e', 'f');
-		
-		for ($i=0; $i<6; $i++) {
-			$color .= $characters[array_rand($characters)];
-		}
-		
-		return '#'.$color;
-	}
-
 	// GETTERS
 	public function print_errors() {
 		$data = [];
