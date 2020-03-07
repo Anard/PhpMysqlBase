@@ -33,7 +33,7 @@ interface Table {
 	// Get current ID
 	public function getIdLoad();
 	// Return true if default access is write access
-	public function isAdmin();
+	public function isAdminSection();
 	// Check if authorized
 	public function rights_control ($read_write = NULL, $id = 0, $userid = 0);
 	// Search if data exists from DB
@@ -276,16 +276,18 @@ abstract class MysqlTable implements Table
 		
 		$this->Ordering = $ordering;
 		$this->Limiting = $limiting;
+				
 		return true;
 	}
 	function _constructExit ($read_write = ACCESS::__default, $loadGetVar = 'idload') {
 		if (!array_key_exists('id', $this->Fields)) return SQL_ERR::KO;
 		$this->default_access = ACCESS::getKey($read_write);
 		foreach ($this->Fields as $field => $Field) {
-			if ($Field->Type == TYPE::PARENT)
-				$this->parentItem = $field; break;
+			if ($Field->Type == TYPE::PARENT) {
+				$this->parentItem = $field;
+				break;
+			}
 		}
-		
 		if (isset($_GET[$loadGetVar]))
 			return $this->load_id ($_GET[$loadGetVar], $this->default_access);
 		else return SQL_ERR::OK;
@@ -352,7 +354,7 @@ abstract class MysqlTable implements Table
 	}
 	
 	// Is default access ACCESS::WRITE ?
-	public function isAdmin() {
+	public function isAdminSection() {
 		return ($this->default_access == ACCESS::WRITE);	
 	}
 	
@@ -477,7 +479,7 @@ abstract class MysqlTable implements Table
 				if ($this->Parent !== NULL) {
 					if ($this->Limiting != "") $limit = ' AND '.$this->Limiting;
 					$reponse = $this->bdd->prepare('SELECT '.$fields.' FROM '.$this->Table.' WHERE '.$this->parentItem.' = :parent'.$limit.$this->getOrdering());
-					$reponse->bindParam('parent', $this->Parent->Fieds['id']->value, PDO::PARAM_INT);
+					$reponse->bindParam('parent', $this->Parent->Fields['id']->value, PDO::PARAM_INT);
 					$reponse->execute();
 					$donnees = $reponse->fetchAll();
 					$reponse->closeCursor();
@@ -491,8 +493,8 @@ abstract class MysqlTable implements Table
 						$donnees['listData'] = array(
 							'table' => $this->table,
 							'parentTable' => $this->Parent->table,
-							'currentId' => $this->idLoad,
-							'parentId' => $this->Parent->idLoad,
+							'currentId' => $this->getIdLoad(),
+							'parentId' => $this->Parent->Fields['id']->value,
 							'nombre' => $nombre,
 						);
 					}
@@ -579,7 +581,7 @@ abstract class MysqlTable implements Table
 						'table' => $this->table,
 						'listName' => $this->Fields['id']->Name,
 						'defaultId' => $this->Fields['id']->Default,
-						'currentId' => $this->Fields['id']->value,
+						'currentId' => $this->getIdLoad(),
 						'first' => $first,
 						'nombre' => $nombre,
 						'prec' => $prec,
@@ -621,7 +623,7 @@ abstract class MysqlTable implements Table
 					// if get isn't null and Parent exists, set parent id if known
 					if ($this->Parent !== NULL) {
 						if (array_key_exists($this->parentItem, $donnees))
-							$donnees[$this->parentItem] = $this->Parent->idLoad;
+							$donnees[$this->parentItem] = $this->Parent->getidLoad();
 					}
 				}
 				else {
@@ -1148,7 +1150,7 @@ abstract class MysqlTable implements Table
 			if ($this->is_data($loadid)) {
 				if ($this->rights_control($read_write, $loadid)) {
 					$data = $this->get_data ($loadid, GET::ALL, $read_write);
-					foreach ($this->Fields as $field => $Field)
+					foreach ($this->Fields as $field => &$Field)
 						$Field->value = $data[$field];
 				}
 				else {
@@ -1159,9 +1161,9 @@ abstract class MysqlTable implements Table
 			}
 		}
 
-		if ($this->Parent === NULL || !is_numeric($this->getIdLoad()) || $this->idLoad == 0) return SQL_ERR::OK;
+		if ($this->Parent === NULL || !is_numeric($this->getIdLoad()) || $this->getIdLoad() == 0) return SQL_ERR::OK;
 		// Load parent
-		return $this->Parent->load_id($this->get_data($this->idLoad, $this->parentItem, $read_write), $read_write);
+		return $this->Parent->load_id($this->get_data($this->getIdLoad(), $this->parentItem, $read_write), $read_write);
 	}
 }
 
