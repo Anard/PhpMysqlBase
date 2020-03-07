@@ -131,6 +131,14 @@ class FileField extends Field implements FileInterface {
 		if ($name != self::preloadFileName($name)) $this->Preload = new Field (TYPE::TEXT, self::preloadFileName($name), '');
 	}
 	
+	//DEEBUUG///
+	
+	public function print_preloaded () {
+		return (print_r($this->Preload));
+		
+		
+	}
+	
 	// ------- Interface Methods ---------
 	// STATIC
 	// return preload File field name
@@ -185,9 +193,8 @@ class FileField extends Field implements FileInterface {
 	
 	// Upload file, returns final file name
 	public function upload ($table, $field) {
-		$field = DataManagement::secureText($field);
-
 		if (!array_key_exists($table, self::PATH_UPLOAD)) {
+			echo $table.' ==> PATH UNFOUND';
 			array_push ($this->Errors, FILE_ERR::KO);
 			return NULL;
 		}
@@ -195,6 +202,7 @@ class FileField extends Field implements FileInterface {
 		// Before upload, data should have been validated. If we use preloaded file, $_FILES[$field] have been unset;
 		// ever uploaded in temp dir
 		if (!isset($_FILES[$field])) {
+			echo print_r ($table); echo '<br />'; print_r ($field); echo '<br />'; print_r ($file); echo '<br />';
 			if (!isset($_POST[$this->Preload->Name]) || $_POST[$this->Preload->Name] == '')
 				return NULL;
 			else {
@@ -217,7 +225,7 @@ class FileField extends Field implements FileInterface {
 		else $move = move_uploaded_file($file['tmp_name'], $path.$nom);
 		
 		if ($move) return $nom;
-		array_push ($this->Errors, FILE_ERR_UPLOAD);
+		array_push ($this->Errors, FILE_ERR::UPLOAD);
 		return NULL;
 	}
 
@@ -276,7 +284,7 @@ class FileField extends Field implements FileInterface {
 				case FILE_TYPE::GIF:
 					// handlers remain null il key doesn't exist
                     if (!$imageHandlers)  $imageHandlers = exif_imagetype($src);
-					if (array_key_exists($imageHandlers, self::HANDLERS) && self::HANDLERS[$imageHandlers]['type'] == $type)
+					if ($imageHandlers && array_key_exists($imageHandlers, self::HANDLERS) && self::HANDLERS[$imageHandlers]['type'] == $type)
 						$handlers = self::HANDLERS[$imageHandlers];
 					break;
 					
@@ -464,6 +472,8 @@ class UI_File implements UI_FileInterface {
 	// Methods
 	public static function draw_fieldset ($field, $table, $maxSize, $image = "") {
 		if (!is_numeric($maxSize)) return false;
+		if (!array_key_exists($table, FileField::PATH_UPLOAD)) return false;
+		$image = FileField::PATH_UPLOAD[$table].$image;
 		if (!file_exists($image) || !is_file($image)) $image = "";
 		echo '<div class="container">';
 			echo '<p>Vous pouvez choisir une image (jpg, png, gif) pour illustrer la page (maximum '.$maxSize.'Mo).</p>';

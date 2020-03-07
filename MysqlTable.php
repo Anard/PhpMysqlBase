@@ -816,7 +816,7 @@ abstract class MysqlTable implements Table
 				
 				case TYPE::FILE:
 					if ($nbErrors == 0)
-						$validValues[$field] = $value['tmp_name']; // just to give a value, FileField->upload will finally upload right one
+						$validValues[$field] = 'UPLOAD'; // just to give a value, FileField->upload will finally upload right one
 					break;
 
 				default:
@@ -883,25 +883,10 @@ abstract class MysqlTable implements Table
 		}
 
 		// First delete dependencies
-		// uploaded files
-		$fileFields = array();
-		foreach ($this->Fields as $field) {
-			if ($field->Type == TYPE::FILE)
-				array_push($fileFields, $field);
-		}
-		// if files in table, get data
-		// else only test if entry exists
-		if (sizeof($fileFields) > 0)
-			$fullFields = implode(', ', array_keys($fileFields));
-		else $fullFields = 'id';
-		$reponse = $this->bdd->prepare ('SELECT '.$fullFields.' FROM '.$this->Table.' WHERE id = :id');
-		$reponse->bindParam('id', $id, PDO::PARAM_INT);
-		$ret = $reponse->execute();
-		if (!$ret) return false;
-		// delete files
-		foreach ($fileFields as $field) {
-			if (file_exists($field))
-					unlink ($field);
+		// delete linked files
+		foreach ($this->Fields as $field => $Field) {
+			if ($Field->Type == TYPE::FILE)
+				$Field->delete($this->get_data($id, $field, ACCESS::WRITE));
 		}
 		
 		// childrens & authorisations
@@ -930,13 +915,7 @@ abstract class MysqlTable implements Table
 				break;
 			default: break;
 		}
-		
-		// Delete linked files
-		foreach ($this->Fields as $field => $Field) {
-			if ($Field->Type == TYPE_FILE)
-				$Field->delete($this->get_data($id, $field, ACCESS::WRITE));
-		}
-		
+				
 		// Finally delete entry
 		$reponse = $this->bdd->prepare('DELETE FROM '.$this->Table.' WHERE id = :id');
 		$reponse->bindParam('id', $id, PDO::PARAM_INT);
@@ -969,7 +948,7 @@ abstract class MysqlTable implements Table
 		if ($type == TYPE::PASSWD && $value == "") return false;
 		
 		if ($type == TYPE::FILE) {
-			$value = $this->Fields[$field]->upload($this->Table, $field);
+			$value = $this->Fields[$field]->upload($this->table, $field);
 			if (!$value) return false;
 		}
 		
@@ -1001,6 +980,8 @@ abstract class MysqlTable implements Table
 		if (sizeof($this->Fields['id']->Errors) > 0)
 			return false;
 
+		print_r ($fields);
+		
 		$echoValues = [];
 		foreach ($fields as $field => $value) {
 			$type = $this->Fields[$field]->Type;
@@ -1012,7 +993,7 @@ abstract class MysqlTable implements Table
 				return false;
 
 			if ($type == TYPE::FILE) {
-				$value = $this->Fields[$field]->upload($this->Table, $field);
+				$value = $this->Fields[$field]->upload($this->table, $field);
 				if (!$value) $value == "";
 			}
 		
