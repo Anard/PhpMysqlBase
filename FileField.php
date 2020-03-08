@@ -148,6 +148,12 @@ class FileField extends Field implements FileInterface {
 		return false;
 	}
 	
+	// OVERRIDE Field's methods
+	public function isValidValue ($field) {
+		return $this->Fields[$field]->validatePostedFile ($field);
+	}
+	
+	// SPECIFICS
 	// Getters
 	public function getFileInfo ($path = '') {
 		if ($path == '') $path = $this->value;

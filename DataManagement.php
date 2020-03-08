@@ -1,10 +1,13 @@
 <?php
-// STATIC basic functions for Data Management
+date_default_timezone_set('Europe/Paris');
+
+	// STATIC basic functions for Data Management
 class DataManagement {
 	//prevent instanciation
 	function ___construct () { }
 	
 	// Static Methods
+	// Affichage
 	public static function secureText($texte) {
 		return htmlentities($texte, ENT_QUOTES);
 	}
@@ -16,7 +19,7 @@ class DataManagement {
 		}
 	}
 	public static function afficheMail($mail) {
-		return str_replace (' @ ', ' [AT] ', $mail);
+		return str_replace ('@', ' [AT] ', $mail);
 	}
 
 	public static function randomColor() {
@@ -28,6 +31,25 @@ class DataManagement {
 		}
 		
 		return '#'.$color;
+	}
+	
+	// Mise en forme des données pour enregistrement vers la BDD
+	public static function formatDate ($date) {
+		if (is_object($date)) {
+			if ($date->formt('Y') < 2018) return "";
+			return $date->format ('Y-m-d');
+		}
+		echo 'DEBUG ::: Date '.$date.' is not Object<br />';
+		if (preg_match ('#^([\d]{1,2})\/([\d]{1,2})\/([\d]{2,4})$#', $date) == 1)
+			$date = preg_replace ('#^([\d]{1,2})\/([\d]{2})\/([\d]{2,4})$#', '$3-$2-$1', $date);
+		if (intval(date('Y', strtotime($date)) < 2018)) return "";
+		return date('Y-m-d', strtotime($date));
+	}
+	public static function formatTime ($time) {
+		return date('His', strtotime($time));
+	}
+	public static function removeSpaces ($data) {
+		return preg_replace ('#\s#', '', $data);
 	}
 }
 ?>

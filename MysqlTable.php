@@ -45,8 +45,6 @@ interface UI_Table {
 
 // ERRORS
 class SQL_ERR extends ERR {
-	const INVALID =	-1;	// generic invalid (should not happen as normally ever checked (see update & insert on isValidField))
-	
 	// generics
 	const ACCESS =		10;
 	const SENDMAIL =	11;
@@ -214,13 +212,14 @@ abstract class MysqlTable implements Table
 		$data = [];
 		foreach ($this->Fields as $field => &$Field)
 			$data[$field] = $Field->value;
+		unset ($Field);
 		foreach ($this->Errors as $error) {
 			if (SQL_ERR::print_error ($error, $this->Fields['id']->Name, $data) !== false) return true;
 		}
 		foreach ($this->Fields as &$Field) {
-			if ($Field->print_errors ($data) !== false) return true;
+			if ($Field->print_errors($data) !== false) { unset ($Field); return true; }
 		}
-		return false;
+		unset ($Field); return false;
 	}
 	
 	// Get table short name
@@ -234,7 +233,7 @@ abstract class MysqlTable implements Table
 			$ret = [];
 			foreach ($this->Fields as $field => $Field)
 				$ret[$field] = $Field->Default;
-			return $this->secure_data($ret);
+			return $ret;
 		}
 		if (is_array($fields)) {
 			$ret = [];
@@ -242,10 +241,10 @@ abstract class MysqlTable implements Table
 				if (!array_key_exists ($field, $this->Fields)) continue;
 				$ret[$field] = $this->Fields[$field]->Default;
 			}
-			return $this->secure_data($ret);
+			return $ret;
 		}
 		elseif (array_key_exists ($fields, $this->Fields))
-			return ($this->_secure_data($this->Fields[$field]->Default, $this->Fields[$fields]->Type));
+			return $this->Fields[$field]->Default;
 		else return NULL;
 	}
 
@@ -502,7 +501,7 @@ abstract class MysqlTable implements Table
 					$reponse->closeCursor();
 					foreach ($donnees as &$data)
 						$data = $this->secure_data($data);
-					unset($value); // break the reference with the last element
+					unset($data); // break the reference with the last element
 					break;
 				}
 
@@ -537,7 +536,7 @@ abstract class MysqlTable implements Table
 				}
 				if ($donnees) {
 					// tranform array $donnees in single value;
-					if ($fields != GET::ALL && !is_array($fields)) $donnees = $this->_secure_data ($donnees[$fields], $this->Fields[$fields]->Type);
+					if ($fields != GET::ALL && !is_array($fields)) $donnees = $this->Fields[$fields]->secure_data ($donnees[$fields]);
 					else $donnees = $this->secure_data($donnees);
 				}
 				break;
@@ -628,23 +627,14 @@ abstract class MysqlTable implements Table
 				return ($this->is_data($value) ? FIELD_ERR::OK : FIELD_ERR::UNKNOWN);
 			case TYPE::PARENT:
 				return ($this->Parent->is_data($value) ? FIELD_ERR::OK : FIELD_ERR::UNKNOWN);
-			case TYPE::NUM:		return (is_numeric($value) ? FIELD_ERR::OK : FIELD_ERR::NOTNUM);
-			
-			case TYPE::MAIL:	return (filter_var($value, FILTER_VALIDATE_EMAIL) ? FIELD_ERR::OK : FIELD_ERR::NOTMAIL);
-			case TYPE::TEL:		return ((preg_match ('#^[0-9]{10}$#', preg_replace ('#\s#', '', $value)) == 1) ? FIELD_ERR::OK : FIELD_ERR::NOTTEL);
-			case TYPE::DATE: //return ((preg_match ('#^[0-9]{2,4}-[0-9]{2}-[0-9]{2}$#', $value) == 1) ? FIELD_ERR::OK : FIELD_ERR::DATE);
-								return ($value !== false ? FIELD_ERR::OK : FIELD_ERR::NOTDATE);
-			case TYPE::HOUR:	return ((preg_match ('#^([0-1][0-9])|(2[0-3]):[0-5][0-9](:[0-5][0-9])?$#',$value) == 1) ? FIELD_ERR::OK : FIELD_ERR::HOUR);
-			case TYPE::LINK:	return (filter_var($value, FILTER_VALIDATE_URL) ? FIELD_ERR::OK : FIELD_ERR::NOTLINK);
-			case TYPE::COLOR:	return ((preg_match ('/^(#[0-9a-fA-F]{6})|(rgb\((\s*[01]?[0-9]?[0-9]|2[0-4][0-9]|25[0-5]\s*,){2}\s*[01]?[0-9]?[0-9]|2[0-4][0-9]|25[0-5]\s*\))$/',$value) == 1) ? FIELD_ERR::OK : FIELD_ERR::NOTCOLOR);
-			
-			case TYPE::FILE:	return $this->Fields[$field]->validatePostedFile ($field);
-			default:			return FIELD_ERR::OK;
+				
+			default:
+				return $this->Fields[$field]->isValidValue ($value);
 		}
 	}
 	
 	// check also if required, don't return error (boolean)
-	protected function isValidField ($field, $value) {
+	/*protected function isValidField ($field, $value) {
 		if (!array_key_exists($field, $this->Fields)) return false;
 
 		switch ($this->Fields[$field]->Required) {
@@ -655,7 +645,7 @@ abstract class MysqlTable implements Table
 				if ($value != "") return ($this->isValidValue ($field, $value) === FIELD_ERR::OK);
 				else return $this->Fields[$field]->Required;
 		}
-	}
+	}*/
 	
 	// Validate posted data and push errors
 	protected function _validate_posted_data ($postedValues) {
@@ -664,7 +654,7 @@ abstract class MysqlTable implements Table
 			
 			// search errors
 			$err = ($value != "" ? $this->isValidValue($field, $value) : FIELD_ERR::OK);
-			if ($err && ($this->Fields[$field]->Type != TYPE::ID || $value > 0))
+			if ($err && ($this->Fields[$field]->Type != TYPE::ID || $value > 0)) // ID is 0 too insert data
 				array_push($this->Fields[$field]->Errors, $err);
 			
 			$nbErrors = sizeof($this->Fields[$field]->Errors);
@@ -717,32 +707,8 @@ abstract class MysqlTable implements Table
 		$validValues = [];
 		foreach ($postedValues as $field => $value) {
 			if (!array_key_exists ($field, $this->Fields)) continue;
-			$nbErrors = sizeof ($this->Fields[$field]->Errors);
-			switch ($this->Fields[$field]->Type) {
-				case TYPE::ID: 
-				case TYPE::PARENT:
-					$validValues[$field] = $value;
-					break;
-					
-				case TYPE::PASSWD:
-					if ($value == "" || ($nbErrors > 0 && ($nbErrors > 1 || $this->Fields[$field]->Errors[0] != FIELD_ERR::NEEDED)))
-						$validValues[$field] = $this->getDefaults([$field]);
-					else $validValues[$field] = password_hash ($value, PASSWORD_DEFAULT);
-					break;
-				
-				case TYPE::FILE:
-					if ($nbErrors == 0)
-						$validValues[$field] = 'UPLOAD'; // just to give a value, FileField->upload will finally upload right one
-					break;
-
-				default:
-					if ($nbErrors > 0 && ($nbErrors > 1 || $this->Fields[$field]->Errors[0] != FIELD_ERR::NEEDED))
-						$validValues[$field] = $this->getDefaults([$field]);
-					else $validValues[$field] = $value;
-					break;
-			}
+			$validValues[$field] = $this->Fields[$field]->validate_data ($value);
 		}
-		
 		return $validValues;
 	}
 	
@@ -765,11 +731,11 @@ abstract class MysqlTable implements Table
 					$default = ""; break;
 			}
 		}
-		else $default = $this->_secure_data ($default, $type);
 		
 		return ($this->Fields[$field] = new Field($type, $name, $default, $required, $unique));
 	}
 	
+	// Record validated values to DB
 	protected function _record_changes ($validatedValues) {
 		// Insert
 		if ($validatedValues['id'] == 0) {
@@ -782,7 +748,7 @@ abstract class MysqlTable implements Table
 		elseif (sizeof($this->Fields['id']->Errors) == 0) {
 			$ret = false;	// $ret is true if one modif executed
 			foreach ($validatedValues as $field => $value)
-				$ret = ($this->update_field ($validatedValues['id'], $field, $validatedValues[$field]) === true ? true : $ret);
+				$ret = ($this->update_field ($validatedValues['id'], $field, $value) === true ? true : $ret);
 			$this->load_id ($validatedValues['id']);
 			return $ret;
 		}
@@ -869,14 +835,13 @@ abstract class MysqlTable implements Table
 		}
 		
 		$reponse = $this->bdd->prepare('UPDATE '.$this->Table.' SET '.$field.' = :value WHERE id = :id');
-		$endValue = $this->format_data($field, $value);
 		switch ($this->Fields[$field]->Type) {
 			case TYPE::ID:
 			case TYPE::PARENT:
 			case TYPE::NUM:
-				$reponse->bindParam('value', $endValue, PDO::PARAM_INT); break;
+				$reponse->bindParam('value', $value, PDO::PARAM_INT); break;
 				
-			default: $reponse->bindParam('value', $endValue, PDO::PARAM_STR); break;
+			default: $reponse->bindParam('value', $value, PDO::PARAM_STR); break;
 		}
 		$reponse->bindParam('id', $id, PDO::PARAM_INT);
 		$ret = ($reponse->execute());
@@ -888,7 +853,7 @@ abstract class MysqlTable implements Table
 
 	// PRIVATE
 	// Insert full entry in DB, return false or ID of created entry
-	private function insert_data ($fields) {
+	private function insert_data ($validatedValues) {
 		if (!$this->rights_control(ACCESS::WRITE, 0, SessionManagement::getSessId())) {
 			array_push ($this->Errors, SQL_ERR::ACCESS);
 			return false;
@@ -897,10 +862,10 @@ abstract class MysqlTable implements Table
 			return false;
 
 		$echoValues = [];
-		foreach ($fields as $field => $value) {
+		foreach ($validatedValues as $field => $value) {
 			$type = $this->Fields[$field]->Type;
 			if (!array_key_exists($field, $this->Fields) || $type == TYPE::ID) {
-				unset ($fields[$field]);
+				unset ($validatedValues[$field]);
 				continue;
 			}
 			if (sizeof($this->Fields[$field]->Errors) > 0)
@@ -914,7 +879,7 @@ abstract class MysqlTable implements Table
 			$echoValues[$field] = ':'.strtolower($field);
 		}
 		
-		$fullFields = implode(', ', array_keys($fields));
+		$fullFields = implode(', ', array_keys($validatedValues));
 		$fullValues = implode(', ', $echoValues);
 		$reponse = $this->bdd->prepare ('INSERT INTO '.$this->Table.' ('.$fullFields.') VALUES ('.$fullValues.')');
 
@@ -922,10 +887,11 @@ abstract class MysqlTable implements Table
 			switch ($this->Fields[$field]->Type) {
 				case TYPE::PARENT:
 				case TYPE::NUM:
-					$reponse->bindParam(strtolower($field), $this->format_data($field, $value), PDO::PARAM_INT);
+				case TYPE::BOOL:
+					$reponse->bindParam(strtolower($field), $value, PDO::PARAM_INT);
 					break;	
 				default:
-					$reponse->bindValue(strtolower($field), $this->format_data($field, $value));
+					$reponse->bindValue(strtolower($field), $value);
 					break;
 			}
 		}
@@ -965,72 +931,16 @@ abstract class MysqlTable implements Table
 		return $donnees['id'];
 	}
 	
-	// Secure array for printing, set $record = true destination is DB
+	// Secure full array for printing, set $record = true destination is DB
 	protected function secure_data ($data, $record = false) {
-		foreach ($data as $key => &$value) {
-			if (!array_key_exists($key, $this->Fields)) continue;
+		foreach ($data as $field => &$value) {
+			if (!array_key_exists($field, $this->Fields)) continue;
 			if ($value != "")
-				$value = $this->_secure_data ($value, $this->Fields[$key]->Type, $record);
+				$value = $this->Fields[$field]->secure_data ($value, $record);
 		}
 		unset($value); // break the reference with the last element
 		
 		return $data;
-	}
-	
-	// Récupération d'une donnée d'un type précis (BDD ou entrée utilisateur)
-	private function _secure_data ($data, $type = TYPE::NONE, $record = false) {
-		switch ($type) {
-			case TYPE::BOOL:
-				return ($data ? true : false);
-			case TYPE::ID:
-			case TYPE::PARENT:
-			case TYPE::NUM:
-				return intval($data);
-
-			case TYPE::DATE:
-				if (preg_match ('#^[0-9]+$#', $data) == 1)
-					return new DateTime (strtotime($data));
-				else return DateTime::createFromFormat ('Y-m-d', $data);
-				//return date('j/m/Y', strtotime($data));
-			case TYPE::HOUR:
-				return date('H:m', strtotime($data));
-			
-			case TYPE::COLOR:
-				return preg_replace('#\s#', '', DataManagement::secureText($data));
-			case TYPE::FILE: if (is_array($data)) break;	// files' $value is an array [ 'tmp_name', 'name', 'error', etc ] only when posted
-															// it's text when from DB
-				
-			default:
-				if ($record) return $data;
-				else return DataManagement::secureText($data);
-		}
-	}
-	
-	// Mise en forme des données pour enregistrement vers la BDD
-	private function formatDate ($date) {
-		if (preg_match ('#^([\d]{1,2})\/([\d]{1,2})\/([\d]{2,4})$#', $date) == 1)
-			$date = preg_replace ('#^([\d]{1,2})\/([\d]{2})\/([\d]{2,4})$#', '$3-$2-$1', $date);
-		if (intval(date('Y', strtotime($date)) < 2018)) return "";
-		return date('Y-m-d', strtotime($date));
-	}
-	private function formatTime ($time) {
-		return date('His', strtotime($time));
-	}
-	private function removeSpaces ($data) {
-		return preg_replace ('#\s#', '', $data);
-	}
-	private function format_data ($field, $data) {
-		if (array_key_exists($field, $this->Fields)) $type = $this->Fields[$field]->Type;
-		elseif (TYPE::hasKey($field)) $type = $field;
-		else return NULL;
-		
-		switch ($type) {
-			case TYPE::DATE: return $data->format('Y-m-d');
-			case TYPE::HOUR: return $this->formatTime($data);
-			case TYPE::BOOL: return ($data ? 1 : 0);
-			case TYPE::COLOR: return $this->removeSpaces($data);
-			default: return $data;
-		}
 	}
 	
 	// try to page load an id
@@ -1047,6 +957,7 @@ abstract class MysqlTable implements Table
 					$data = $this->get_data ($loadid, GET::ALL, $read_write);
 					foreach ($this->Fields as $field => &$Field)
 						$Field->value = $data[$field];
+					unset ($Field);
 				}
 				else {
 					if (!headers_sent()) header ('HTTP/1.1 401 Unauthorized');

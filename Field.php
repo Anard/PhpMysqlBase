@@ -5,12 +5,16 @@ require_once ('Generic.php');
 interface FieldInterface {
 	// PUBLIC
 	public function print_errors();
+	// Récupération d'une donnée d'un type précis (BDD ou entrée utilisateur)
+	public function secure_data ($data, $record = false);
+	// Contrôle de la validité d'un champ, return error
+	public function isValidValue ($value);
+	// Validate posted value to recording (requested value or default if error recorded)
+	public function validate_data ($value);
 }
 
 // ERRORS
 class FIELD_ERR extends ERR {
-	const INVALID =	-1;	// generic invalid (should not happen as normally ever checked (see update & insert on isValidField))
-	
 	// std errors
 	const UNKNOWN =	10;
 
@@ -154,7 +158,7 @@ class Field implements FieldInterface
 		else return NULL;
 
 		$this->Name = DataManagement::secureText($name);
-		$this->Default = $default;
+		$this->Default = $this->secure_data ($default);
 	}
 	
 	// PUBLIC
@@ -163,6 +167,95 @@ class Field implements FieldInterface
 			if (FIELD_ERR::print_error($error, $this->Name, $data) !== false) return true;
 		}
 		return false;
+	}
+	
+	// Récupération d'une donnée d'un type précis (BDD ou entrée utilisateur)
+	public function secure_data ($data, $record = false) {
+		switch ($this->Type) {
+			case TYPE::BOOL:
+				return ($data ? true : false);
+			case TYPE::ID:
+			case TYPE::PARENT:
+			case TYPE::NUM:
+				return intval($data);
+
+			case TYPE::DATE:
+				if (preg_match ('#^[0-9]+$#', $data) == 1)
+					return new DateTime (strtotime($data));
+				else return DateTime::createFromFormat ('Y-m-d', $data);
+				//return date('j/m/Y', strtotime($data));
+			case TYPE::HOUR:
+				return date('H:m', strtotime($data));
+			
+			case TYPE::COLOR:
+				return preg_replace('#\s#', '', DataManagement::secureText($data));
+			case TYPE::FILE: if (is_array($data)) break;	// files' $value is an array [ 'tmp_name', 'name', 'error', etc ] only when posted
+															// it's text when from DB
+				
+			default:
+				if ($record) return $data;
+				else return DataManagement::secureText($data);
+		}
+	}
+	
+	// Contrôle de la validité d'un champ, return error
+	public function isValidValue ($value) {
+		switch ($this->Type) {
+			// ID and parent's types have to be ever checked, need access to db
+			case TYPE::ID:
+			case TYPE::PARENT:	return FIELD_ERR::KO;
+				
+			case TYPE::NUM:		return (is_numeric($value) ? FIELD_ERR::OK : FIELD_ERR::NOTNUM);
+			case TYPE::MAIL:	return (filter_var($value, FILTER_VALIDATE_EMAIL) ? FIELD_ERR::OK : FIELD_ERR::NOTMAIL);
+			case TYPE::TEL:		return ((preg_match ('#^[0-9]{10}$#', preg_replace ('#\s#', '', $value)) == 1) ? FIELD_ERR::OK : FIELD_ERR::NOTTEL);
+			case TYPE::DATE: //return ((preg_match ('#^[0-9]{2,4}-[0-9]{2}-[0-9]{2}$#', $value) == 1) ? FIELD_ERR::OK : FIELD_ERR::DATE);
+								return ($value !== false ? FIELD_ERR::OK : FIELD_ERR::NOTDATE);
+			case TYPE::HOUR:	return ((preg_match ('#^([0-1][0-9])|(2[0-3]):[0-5][0-9](:[0-5][0-9])?$#',$value) == 1) ? FIELD_ERR::OK : FIELD_ERR::HOUR);
+			case TYPE::LINK:	return (filter_var($value, FILTER_VALIDATE_URL) ? FIELD_ERR::OK : FIELD_ERR::NOTLINK);
+			case TYPE::COLOR:	return ((preg_match ('/^(#[0-9a-fA-F]{6})|(rgb\((\s*[01]?[0-9]?[0-9]|2[0-4][0-9]|25[0-5]\s*,){2}\s*[01]?[0-9]?[0-9]|2[0-4][0-9]|25[0-5]\s*\))$/',$value) == 1) ? FIELD_ERR::OK : FIELD_ERR::NOTCOLOR);
+			
+			// FileField override this function
+			case TYPE::FILE:	return FIELD_ERR::KO;
+			default:			return FIELD_ERR::OK;
+		}
+	}
+	
+	// Validate posted value to recording (requested value or default if error recorded)
+	public function validate_data ($value) {
+		$nbErrors = sizeof ($this->Errors);
+		switch ($this->Type) {
+			case TYPE::FILE:
+				if ($nbErrors == 0) return 'UPLOAD'; // just to give a value, FileField->upload will finally upload right one on last moment
+				break;
+
+			case TYPE::ID:
+			case TYPE::PARENT:
+				$nbErrors = 0; // and continue (return formatData)
+			default:
+				if ($nbErrors > 0 && ($nbErrors > 1 || $this->Errors[0] != FIELD_ERR::NEEDED))
+					break;
+				else return $this->formatData($value);
+				break;
+		}
+	
+		return $this->Default;
+	}
+	
+	private function formatData ($data) {
+		switch ($this->Type) {
+			case TYPE::ID:
+			case TYPE::PARENT:
+			case TYPE::NUM:			return intval ($data);
+
+			case TYPE::DATE:		return DataManagement::formatDate($data);
+			case TYPE::HOUR:		return DataManagement::formatTime($data);
+			case TYPE::BOOL:		return ($data ? 1 : 0);
+			case TYPE::COLOR:		return DataManagement::removeSpaces($data);
+			case TYPE::PASSWD:		if ($data != "") // do not hash empty value, which won't be empty any more !
+										return password_hash ($data, PASSWORD_DEFAULT);
+									else return "";
+			default: return $data;
+		}
 	}
 }
 ?>
