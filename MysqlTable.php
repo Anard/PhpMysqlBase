@@ -59,7 +59,7 @@ class SQL_ERR extends ERR {
 		switch ($error) {
 			case self::ACCESS:
 				echo '<h3 class="alert">Vous n\'avez pas les droits requis pour accéder à cette ressource</h3>';
-				return true;
+				return true;	// stop
 			case self::SENDMAIL:
 				echo '<h3 class="alert">L\'envoi du message a échoué en raison d\'une erreur du serveur.</h3>';
 				include ('../Config/headers.php');
@@ -602,6 +602,7 @@ abstract class MysqlTable implements Table
 			case TYPE::ID:
 			case TYPE::PARENT:
 			case TYPE::NUM:
+			case TYPE::BOOL:
 				$reponse->bindParam('value', $value, PDO::PARAM_INT);
 				break;
 			default:
@@ -620,17 +621,22 @@ abstract class MysqlTable implements Table
 	// Contrôle de la validité d'un champ, return error
 	protected function isValidValue ($field, $value) {
 		if (!array_key_exists($field, $this->Fields)) return FIELD_ERR::KO;
-		
-		if ($this->Fields[$field]->Unique && !$this->isUnique($field, $value)) return FIELD_ERR::EXISTS;
 		switch ($this->Fields[$field]->Type) {
 			case TYPE::ID:
-				return ($this->is_data($value) ? FIELD_ERR::OK : FIELD_ERR::UNKNOWN);
+				if ($this->is_data($value)) break;
+				else return FIELD_ERR::UNKNOWN;
 			case TYPE::PARENT:
-				return ($this->Parent->is_data($value) ? FIELD_ERR::OK : FIELD_ERR::UNKNOWN);
+				if ($this->Parent->is_data($value)) break;
+				else return FIELD_ERR::UNKNOWN;
 				
 			default:
-				return $this->Fields[$field]->isValidValue ($value);
+				$err = $this->Fields[$field]->isValidValue ($value);
+				if ($err == FIELD_ERR::OK) break;
+				else return $err;
 		}
+		
+		if ($this->Fields[$field]->Unique && !$this->isUnique($field, $value)) return FIELD_ERR::EXISTS;
+		return FIELD_ERR::OK;
 	}
 	
 	// check also if required, don't return error (boolean)
@@ -839,6 +845,7 @@ abstract class MysqlTable implements Table
 			case TYPE::ID:
 			case TYPE::PARENT:
 			case TYPE::NUM:
+			case TYPE::BOOL:
 				$reponse->bindParam('value', $value, PDO::PARAM_INT); break;
 				
 			default: $reponse->bindParam('value', $value, PDO::PARAM_STR); break;
@@ -891,7 +898,8 @@ abstract class MysqlTable implements Table
 					$reponse->bindParam(strtolower($field), $value, PDO::PARAM_INT);
 					break;	
 				default:
-					$reponse->bindValue(strtolower($field), $value);
+					$reponse->bindParam(strtolower($field), $value, PDO::PARAM_STR);
+					//$reponse->bindValue(strtolower($field), $value);
 					break;
 			}
 		}

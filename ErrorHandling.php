@@ -29,13 +29,7 @@ class ERR extends ExtdEnum
 	// Print error
 	// For each case, return false to continue writing errors or true to stop printing
 	public static function print_error ($error, $rplmtStr = '', $data = []) {
-		switch ($error) {
-			case self::UNKNOWN:
-				echo '<h3 class="alert">';
-				echo self::replaceFields($rplmtStr, $data);
-				echo ' introuvable</h3>';
-				return true;	// stop
-								
+		switch ($error) {				
 			case self::OK: break;
 			default:
 				echo '<h3 class="alert">Erreur(s) inconnue(s) <span class="reduit">('.error.')</span></h3>';

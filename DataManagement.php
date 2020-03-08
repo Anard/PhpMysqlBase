@@ -36,9 +36,10 @@ class DataManagement {
 	// Mise en forme des données pour enregistrement vers la BDD
 	public static function formatDate ($date) {
 		if (is_object($date)) {
-			if ($date->formt('Y') < 2018) return "";
+			if ($date->format('Y') < 2018) return "";
 			return $date->format ('Y-m-d');
 		}
+		// this section will disappear, echo message to see where is called with a textual value
 		echo 'DEBUG ::: Date '.$date.' is not Object<br />';
 		if (preg_match ('#^([\d]{1,2})\/([\d]{1,2})\/([\d]{2,4})$#', $date) == 1)
 			$date = preg_replace ('#^([\d]{1,2})\/([\d]{2})\/([\d]{2,4})$#', '$3-$2-$1', $date);

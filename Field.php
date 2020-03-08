@@ -9,7 +9,7 @@ interface FieldInterface {
 	public function secure_data ($data, $record = false);
 	// Contrôle de la validité d'un champ, return error
 	public function isValidValue ($value);
-	// Validate posted value to recording (requested value or default if error recorded)
+	// Validate posted value for recording (requested value or default if error recorded) and update $this->value to update form too
 	public function validate_data ($value);
 }
 
@@ -26,6 +26,7 @@ class FIELD_ERR extends ERR {
 	const NOTHOUR =	24;
 	const NOTLINK =	25;
 	const NOTCOLOR = 26;
+	const NOTBOOL =	27;
 	
 	// required field errors
 	const NEEDED =	30;
@@ -46,6 +47,12 @@ class FIELD_ERR extends ERR {
 	// Print error
 	public static function print_error ($error, $rplmtStr = '', $data = []) {
 		switch ($error) {
+			case self::UNKNOWN:
+				echo '<h3 class="alert">';
+				echo self::replaceFields($rplmtStr, $data);
+				echo ' introuvable</h3>';
+				return true;	// stop
+
 			case self::NOTNUM:
 				echo '<h3 class="alert">Le champ ';
 				echo self::replaceFields($rplmtStr, $data);
@@ -70,7 +77,15 @@ class FIELD_ERR extends ERR {
 				echo '<h3 class="alert">Lien invalide</h3>';
 				echo '<p class="alert">Le lien fourni est invalide</p>';
 				break;
-			
+			case self::NOTCOLOR:
+				echo '<h3 class="alert">Couleur invalide</h3>';
+				echo '<p class="alert">La couleur doit être au format #HexColor ou rgb(rrr, ggg, bbb)</p>';
+				break;
+			case self::NOTBOOL:
+				echo '<h3 class="alert">Lien invalide</h3>';
+				echo '<p class="alert">Le lien fourni est invalide</p>';
+				break;
+
 			case self::NEEDED:
 			case self::NEED1:	// true == 1
 				echo '<h3 class="alert">Le champ ';
@@ -190,7 +205,7 @@ class Field implements FieldInterface
 			case TYPE::COLOR:
 				return preg_replace('#\s#', '', DataManagement::secureText($data));
 			case TYPE::FILE: if (is_array($data)) break;	// files' $value is an array [ 'tmp_name', 'name', 'error', etc ] only when posted
-															// it's text when from DB
+				// it's text when from DB or preload
 				
 			default:
 				if ($record) return $data;
@@ -206,6 +221,7 @@ class Field implements FieldInterface
 			case TYPE::PARENT:	return FIELD_ERR::KO;
 				
 			case TYPE::NUM:		return (is_numeric($value) ? FIELD_ERR::OK : FIELD_ERR::NOTNUM);
+			case TYPE::BOOL:	return (is_bool($value) ? FIELD_ERR::OK : FIELD_ERR::NOTBOOL);
 			case TYPE::MAIL:	return (filter_var($value, FILTER_VALIDATE_EMAIL) ? FIELD_ERR::OK : FIELD_ERR::NOTMAIL);
 			case TYPE::TEL:		return ((preg_match ('#^[0-9]{10}$#', preg_replace ('#\s#', '', $value)) == 1) ? FIELD_ERR::OK : FIELD_ERR::NOTTEL);
 			case TYPE::DATE: //return ((preg_match ('#^[0-9]{2,4}-[0-9]{2}-[0-9]{2}$#', $value) == 1) ? FIELD_ERR::OK : FIELD_ERR::DATE);
@@ -234,11 +250,14 @@ class Field implements FieldInterface
 			default:
 				if ($nbErrors > 0 && ($nbErrors > 1 || $this->Errors[0] != FIELD_ERR::NEEDED))
 					break;
-				else return $this->formatData($value);
-				break;
+				else {
+					$this->value = $this->formatData($value);
+					return $this->value;
+				}
 		}
-	
-		return $this->Default;
+		
+		$this->value = $this->Default;
+		return $this->value;
 	}
 	
 	private function formatData ($data) {
