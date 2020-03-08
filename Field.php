@@ -174,6 +174,8 @@ class Field implements FieldInterface
 
 		$this->Name = DataManagement::secureText($name);
 		$this->Default = $this->secure_data ($default);
+		
+		return true;
 	}
 	
 	// PUBLIC

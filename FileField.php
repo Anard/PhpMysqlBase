@@ -115,7 +115,7 @@ class FileField extends Field implements FileInterface {
 	public $type = FILE_TYPE::__default;	// final type
 
 	// Construct : list of supported types, maxSize (Mo)
-	function __construct ($name = '', $okTypes = [], $maxSize, $default = NULL, $required = false, $unique = false) {
+	function __construct ($field, $name = '', $okTypes = [], $maxSize, $default = NULL, $required = false, $unique = false) {
 		if (!is_numeric($maxSize)) return FILE_ERR::KO;
 		$this->MaxSize = $maxSize * 1000000;
     	foreach ($okTypes as $type) {
@@ -129,7 +129,8 @@ class FileField extends Field implements FileInterface {
 		
 		if (!parent::__construct(TYPE::FILE, $name, $default, $required, $unique)) return NULL;
 		// create preload field if needed
-		if ($name != self::preloadFileName($name)) $this->Preload = new Field (TYPE::TEXT, self::preloadFileName($name), '');
+		//if ($name != self::preloadFileName($name))
+		$this->Preload = new Field (TYPE::TEXT, self::preloadFileName($field), '');
 	}
 	
 	// ------- Interface Methods ---------
@@ -197,11 +198,10 @@ class FileField extends Field implements FileInterface {
 	// Upload file, returns final file name
 	public function upload ($table, $field) {
 		if (!array_key_exists($table, self::PATH_UPLOAD)) {
-			echo $table.' ==> PATH UNFOUND';
 			array_push ($this->Errors, FILE_ERR::KO);
 			return NULL;
 		}
-		
+
 		// Before upload, data should have been validated. If we use preloaded file, $_FILES[$field] have been unset;
 		// ever uploaded in temp dir
 		if (!isset($_FILES[$field])) {
@@ -222,8 +222,11 @@ class FileField extends Field implements FileInterface {
 		$extension = strtolower(substr(strrchr($file['name'], '.'), 1));
 		$nom = $table.time().'.'.$extension;
 		
-		if ($this->Preload !== NULL && $field == $this->Preload->Name)
+		echo $this->Preload->Name.' - '.$field.'<br />';
+		if ($this->Preload !== NULL && $field == $this->Preload->Name) {
+			echo $file['tmp_name'].', '.$path.$nom.'<br />';
 			$move = rename($file['tmp_name'], $path.$nom);
+		}
 		else $move = move_uploaded_file($file['tmp_name'], $path.$nom);
 		
 		if ($move) return $nom;
@@ -247,7 +250,6 @@ class FileField extends Field implements FileInterface {
 				default:					$err = FILE_ERR::KO; break;
 			}
 		}
-		
 		// try to validate this file
 		if ($err == FILE_ERR::OK)
 			$err = $this->validateFileData ($_FILES[$field]['tmp_name']);

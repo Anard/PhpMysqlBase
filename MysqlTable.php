@@ -869,22 +869,25 @@ abstract class MysqlTable implements Table
 			return false;
 
 		$echoValues = [];
-		foreach ($validatedValues as $field => $value) {
+		foreach ($validatedValues as $field => &$value) {
 			$type = $this->Fields[$field]->Type;
 			if (!array_key_exists($field, $this->Fields) || $type == TYPE::ID) {
 				unset ($validatedValues[$field]);
 				continue;
 			}
-			if (sizeof($this->Fields[$field]->Errors) > 0)
+			if (sizeof($this->Fields[$field]->Errors) > 0) {
+				unset ($value);
 				return false;
-
+			}
+			
 			if ($type == TYPE::FILE) {
 				$value = $this->Fields[$field]->upload($this->table, $field);
-				if (!$value) $value == "";
+				if (!$value) $value = "";
 			}
 		
 			$echoValues[$field] = ':'.strtolower($field);
 		}
+		unset ($value);
 		
 		$fullFields = implode(', ', array_keys($validatedValues));
 		$fullValues = implode(', ', $echoValues);
@@ -898,8 +901,8 @@ abstract class MysqlTable implements Table
 					$reponse->bindParam(strtolower($field), $value, PDO::PARAM_INT);
 					break;	
 				default:
-					$reponse->bindParam(strtolower($field), $value, PDO::PARAM_STR);
-					//$reponse->bindValue(strtolower($field), $value);
+					//$reponse->bindParam(strtolower($field), $value, PDO::PARAM_STR);
+					$reponse->bindValue(strtolower($field), $value);
 					break;
 			}
 		}
