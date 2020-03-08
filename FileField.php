@@ -8,7 +8,7 @@ interface FileInterface {
 	public static function preloadFileName ($field);
 	
 	// PUBLIC
-	public function print_errors();
+	public function print_errors($data = []);
 	// Get current File object
 	public function getFileInfo ();
 	// Delete file
@@ -184,13 +184,14 @@ class FileField extends Field implements FileInterface {
 	public function preload ($field) {
 		// field is a regular posted file, just record it in temp directory and return full path to uploaded file
 		$err = $this->validatePostedFile ($field);
-		if ($err) FILE_ERR::print_errors([ $err ], $this->getFileInfo($_FILES[$field]['tmp_name']));
-        else {
-            $tmpFileName = $this->upload('tmp', $field);
-            if (!$tmpFileName)
-                FILE_ERR::print_errors ($this->Errors, $this->getFileInfo($_FILES[$field]['tmp_name']));
-            else echo self::PATH_UPLOAD['tmp'].$tmpFileName;
-        }
+		if ($err) {
+			array_push ($FileMgmt->Errors, $err);
+			return false;
+		}
+		$tmpFileName = $this->upload('tmp', $field);
+		if (!$tmpFileName) return false;
+		else echo self::PATH_UPLOAD['tmp'].$tmpFileName;
+		return true;
 	}
 	
 	// Upload file, returns final file name

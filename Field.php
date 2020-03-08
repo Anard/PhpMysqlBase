@@ -4,7 +4,7 @@ require_once ('Generic.php');
 // INTERFACE for SQL Fields
 interface FieldInterface {
 	// PUBLIC
-	public function print_errors();
+	public function print_errors($data = []);
 	// Récupération d'une donnée d'un type précis (BDD ou entrée utilisateur)
 	public function secure_data ($data, $record = false);
 	// Contrôle de la validité d'un champ, return error

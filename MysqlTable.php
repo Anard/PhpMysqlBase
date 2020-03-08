@@ -883,7 +883,7 @@ abstract class MysqlTable implements Table
 		$fullValues = implode(', ', $echoValues);
 		$reponse = $this->bdd->prepare ('INSERT INTO '.$this->Table.' ('.$fullFields.') VALUES ('.$fullValues.')');
 
-		foreach ($fields as $field => $value) {
+		foreach ($validatedValues as $field => $value) {
 			switch ($this->Fields[$field]->Type) {
 				case TYPE::PARENT:
 				case TYPE::NUM:
