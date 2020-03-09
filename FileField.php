@@ -12,7 +12,7 @@ interface FileInterface {
 	// Get current File object
 	public function getFileInfo ();
 	// Delete file
-	public function delete();
+	public function delete($table, $file = '');
 	// Preload file in tmp dir (acces via JS)
 	public function preload ($field);
 	// Upload file in DB
@@ -173,12 +173,18 @@ class FileField extends Field implements FileInterface {
 	
 	// Setters
 	// Delete file
-	public function delete() {
-		if (file_exists($this->value)) {
-			unlink ($this->value);
-			return true;
-		}
-		return false;
+	public function delete($table, $file = '') {
+		if ($file = '') $file = $this->value;
+		echo $table;
+		if (strpos ($file, self::PATH_UPLOAD[$table]) != 0)
+			$file = self::PATH_UPLOAD[$table].DataManagement::secureText($file);
+		else $file = DataManagement::secureText($file);
+		
+		if (!file_exists($file) || !is_file($file))
+			return false;
+		
+		unlink ($file);
+		return true;
 	}
 
 	// Preload POST file in tmp dir (updload via JS)
@@ -484,10 +490,10 @@ class UI_File implements UI_FileInterface {
 			if ($image != "") echo 'style="display: block;" ';
 			echo 'src="'.$image.'" alt="" />';
 			echo '<img id="loading" src="../Styles/loading.png" alt="chargement" />';
-		echo '<input type="hidden" name="'.FileField::preloadFileName($field).'" id="uploaded" value="'.$image.'" />';
+		echo '<input type="hidden" name="'.FileField::preloadFileName($field).'" id="uploaded" value="" />';
 			echo '<img class="imgButton" id="deleteimg" ';
 			if ($image == "") { echo 'style="visibility: hidden;" '; }
-			echo 'alt="x" title="Supprimer cette image" src="../Styles/remove.png" onmousedown="this.src=\'../Styles/remove-clic.png\';" onmouseup="this.src=\'../Styles/remove.png\';" onmouseout="this.src=\'../Styles/remove.png\';" onclick="supprImage(\''.$image.'\');" ';
+		echo 'alt="x" title="Supprimer cette image" src="../Styles/remove.png" onmousedown="this.src=\'../Styles/remove-clic.png\';" onmouseup="this.src=\'../Styles/remove.png\';" onmouseout="this.src=\'../Styles/remove.png\';" onclick="supprImage(\''.$table.'\', \''.$image.'\');" ';
 			if ($image != "") { echo 'style="visibility: visible;" '; }
 			echo '/>';
 			echo '<input type="file" id="file" name="'.$field.'" value="" title="Insérer une image" onchange="preloadFile(\''.$table.'\');"><br />';

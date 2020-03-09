@@ -16,7 +16,7 @@ interface FieldInterface {
 // ERRORS
 class FIELD_ERR extends ERR {
 	// std errors
-	const UNKNOWN =	10;
+	const UNKNOWN =	15;
 
 	// type errors
 	const NOTNUM =	20;

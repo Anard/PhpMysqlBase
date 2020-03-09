@@ -32,6 +32,8 @@ interface Table {
 	
 	// SETTERS
 	public function send_form (); // values are from form's POST variables
+	// Delete single file
+	public function deleteFile ($field, $id);
 }
 
 // UI for Table CLASS
@@ -566,7 +568,7 @@ abstract class MysqlTable implements Table
 		return $ret;
 	}
 	
-	// SETTERS		
+	// SETTERS
 	// only final function is public (need at least to check 'action' first)
 	protected function _send_form () {
 		// record settings
@@ -580,6 +582,21 @@ abstract class MysqlTable implements Table
 		return $this->_record_changes ($validatedValues);
 	}
 	
+	// Delete single file, would be bettter to ass bu a real form and send_form function
+	public function deleteFile ($field = "", $id = 0) {
+		if (!array_key_exists($_POST['field'], $this->Fields) || $this->Fields[$_POST['field']]->Type != TYPE::FILE)
+			return SQL_ERR::KO;
+		if (!$this->is_data($id))
+			return FIELD_ERR::UNKNOWN;
+		
+		$this->Fields[$field]->delete($this->table);
+		
+		$reponse = $this->bdd->prepare ('UPDATE FROM '.$this->Table.' SET '.$field.' = "" WHERE id = :id');
+		$reponse->bindParam('id', $id, PDO::PARAM_INT);
+		return ($reponse->execute() ? SQL_ERR::OK : SQL_ERR::UPDATE);
+	}
+	
+
 	// ----------- INTERNAL METHODS ------------
 	// GETTERS
 	// Get Order defaults
@@ -778,7 +795,7 @@ abstract class MysqlTable implements Table
 		// delete linked files
 		foreach ($this->Fields as $field => $Field) {
 			if ($Field->Type == TYPE::FILE)
-				$Field->delete($this->get_data($id, $field, ACCESS::WRITE));
+				$Field->delete($this->table);
 		}
 		
 		// childrens & authorisations
@@ -822,7 +839,7 @@ abstract class MysqlTable implements Table
 		return $ret;
 	}
 	
-	// Update field in DB, return field as been modified
+	// Update field in DB, return true if field as been modified
 	protected function update_field ($id, $field, $value="") {
 		if (!array_key_exists($field, $this->Fields)) return false;
 		$type = $this->Fields[$field]->Type;
@@ -842,6 +859,7 @@ abstract class MysqlTable implements Table
 		if ($type == TYPE::FILE) {
 			$value = $this->Fields[$field]->upload($this->table, $field);
 			if (!$value) return false;
+			else $this->Fields[$field]->delete($this->table);
 		}
 		
 		$reponse = $this->bdd->prepare('UPDATE '.$this->Table.' SET '.$field.' = :value WHERE id = :id');
