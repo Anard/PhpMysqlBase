@@ -629,6 +629,10 @@ abstract class MysqlTable implements Table
 				if ($this->Parent->is_data($value)) break;
 				else return FIELD_ERR::UNKNOWN;
 				
+			case TYPE::FILE:
+				$err = $this->Fields[$field]->isValidValue ($field);
+				if ($err == FIELD_ERR::OK) break;
+				else return $err;
 			default:
 				$err = $this->Fields[$field]->isValidValue ($value);
 				if ($err == FIELD_ERR::OK) break;
@@ -659,7 +663,7 @@ abstract class MysqlTable implements Table
 			if (!array_key_exists($field, $this->Fields)) continue;
 			
 			// search errors
-			$err = ($value != "" ? $this->isValidValue($field, $value) : FIELD_ERR::OK);
+			$err = (($value != "" || $this->Fields[$field]->Type == TYPE::FILE) ? $this->isValidValue($field, $value) : FIELD_ERR::OK);
 			if ($err && ($this->Fields[$field]->Type != TYPE::ID || $value > 0)) // ID is 0 too insert data
 				array_push($this->Fields[$field]->Errors, $err);
 			

@@ -151,7 +151,7 @@ class FileField extends Field implements FileInterface {
 	
 	// OVERRIDE Field's methods
 	public function isValidValue ($field) {
-		return $this->Fields[$field]->validatePostedFile ($field);
+		return $this->validatePostedFile ($field);
 	}
 	
 	// SPECIFICS
@@ -201,16 +201,16 @@ class FileField extends Field implements FileInterface {
 			array_push ($this->Errors, FILE_ERR::KO);
 			return NULL;
 		}
-
 		// Before upload, data should have been validated. If we use preloaded file, $_FILES[$field] have been unset;
 		// ever uploaded in temp dir
 		if (!isset($_FILES[$field])) {
 			if (!isset($_POST[$this->Preload->Name]) || $_POST[$this->Preload->Name] == '')
 				return NULL;
 			else {
+				$preloadedFile = DataManagement::secureText($_POST[$this->Preload->Name]);
 				$file = array (
-					'name'		=> preg_replace ('#((.*)\/)+(tmp[0-9]+\.[A-Za-z]{3,4})$#', '$3', $preloadedValue),
-					'tmp_name'	=> DataManagement::secureText($_POST[$this->Preload->Name])
+					'name'		=> preg_replace ('#((.*)\/)+(tmp[0-9]+\.[A-Za-z]{3,4})$#', '$3', $preloadedFile),
+					'tmp_name'	=> $preloadedFile
 				);
 				$field = $this->Preload->Name;
 			}
@@ -222,11 +222,8 @@ class FileField extends Field implements FileInterface {
 		$extension = strtolower(substr(strrchr($file['name'], '.'), 1));
 		$nom = $table.time().'.'.$extension;
 		
-		echo $this->Preload->Name.' - '.$field.'<br />';
-		if ($this->Preload !== NULL && $field == $this->Preload->Name) {
-			echo $file['tmp_name'].', '.$path.$nom.'<br />';
+		if ($field == $this->Preload->Name)
 			$move = rename($file['tmp_name'], $path.$nom);
-		}
 		else $move = move_uploaded_file($file['tmp_name'], $path.$nom);
 		
 		if ($move) return $nom;
@@ -238,7 +235,6 @@ class FileField extends Field implements FileInterface {
 	public function validatePostedFile ($field) {
 		$field = DataManagement::secureText($field);
 		$err = FILE_ERR::OK;
-		
 		// Contrôles préalables (erreurs PHP)
 		if (!isset($_FILES[$field])) $err = FILE_ERR::KO;
 		elseif ($_FILES[$field]['error'] > 0) {
@@ -250,6 +246,7 @@ class FileField extends Field implements FileInterface {
 				default:					$err = FILE_ERR::KO; break;
 			}
 		}
+		
 		// try to validate this file
 		if ($err == FILE_ERR::OK)
 			$err = $this->validateFileData ($_FILES[$field]['tmp_name']);
@@ -258,7 +255,7 @@ class FileField extends Field implements FileInterface {
 			case FILE_ERR::KO:
 			case FILE_ERR::NOFILE:
 				// try preload field
-				if ($this->Preload !== NULL && isset($_POST[$this->Preload->Name])) {
+				if (isset($_POST[$this->Preload->Name])) {
 					unset ($_FILES[$field]);
 					$err = $this->validateFileData (DataManagement::secureText($_POST[$this->Preload->Name]));
 				}
