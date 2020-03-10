@@ -798,7 +798,7 @@ abstract class MysqlTable implements Table
 		// delete linked files
 		foreach ($this->Fields as $field => $Field) {
 			if ($Field->Type == TYPE::FILE)
-				$Field->delete($this->table);
+				$Field->delete($this->table, $this->get_data($id, $field));
 		}
 		
 		// childrens & authorisations
