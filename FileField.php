@@ -174,12 +174,11 @@ class FileField extends Field implements FileInterface {
 	// Setters
 	// Delete file
 	public function delete($table, $file = '') {
-		if ($file = '') $file = $this->value;
-		echo $table;
-		if (strpos ($file, self::PATH_UPLOAD[$table]) != 0)
-			$file = self::PATH_UPLOAD[$table].DataManagement::secureText($file);
+		if ($file == '') $file = $this->value;
 		else $file = DataManagement::secureText($file);
-		
+		if (strpos ($file, self::PATH_UPLOAD[$table]) === false)
+			$file = self::PATH_UPLOAD[$table].$file;
+
 		if (!file_exists($file) || !is_file($file))
 			return false;
 		

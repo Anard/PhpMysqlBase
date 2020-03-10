@@ -584,14 +584,17 @@ abstract class MysqlTable implements Table
 	
 	// Delete single file, would be bettter to ass bu a real form and send_form function
 	public function deleteFile ($field = "", $id = 0) {
+		if (!$this->rights_control(ACCESS::WRITE, $id))
+			return SQL_ERR::ACCESS;
 		if (!array_key_exists($_POST['field'], $this->Fields) || $this->Fields[$_POST['field']]->Type != TYPE::FILE)
 			return SQL_ERR::KO;
 		if (!$this->is_data($id))
 			return FIELD_ERR::UNKNOWN;
 		
-		$this->Fields[$field]->delete($this->table);
-		
-		$reponse = $this->bdd->prepare ('UPDATE FROM '.$this->Table.' SET '.$field.' = "" WHERE id = :id');
+		$path = $this->get_data ($id, $field);
+		$this->Fields[$field]->delete($this->table, $path);
+
+		$reponse = $this->bdd->prepare ('UPDATE '.$this->Table.' SET '.$field.' = "" WHERE id = :id');
 		$reponse->bindParam('id', $id, PDO::PARAM_INT);
 		return ($reponse->execute() ? SQL_ERR::OK : SQL_ERR::UPDATE);
 	}
@@ -859,7 +862,7 @@ abstract class MysqlTable implements Table
 		if ($type == TYPE::FILE) {
 			$value = $this->Fields[$field]->upload($this->table, $field);
 			if (!$value) return false;
-			else $this->Fields[$field]->delete($this->table);
+			else $this->Fields[$field]->delete($this->table, $curValue);
 		}
 		
 		$reponse = $this->bdd->prepare('UPDATE '.$this->Table.' SET '.$field.' = :value WHERE id = :id');

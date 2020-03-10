@@ -202,7 +202,7 @@ final class SessionManagement implements Session
 		$cookies = PREFS::getConstList();
 		foreach ($cookies as $cookie) {
 			if (isset ($_POST[$cookie['name']]) && is_numeric($_POST[$cookie['name']]))
-				setcookie ($cookie['name'], $_POST[$cookie['name']], $cookie['expire']); 	
+				setcookie ($cookie['name'], $_POST[$cookie['name']], $cookie['expire']);
 		}
 	}
 
