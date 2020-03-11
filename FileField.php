@@ -12,9 +12,9 @@ interface FileInterface {
 	// Get current File object
 	public function getFileInfo ();
 	// Delete file
-	public function delete($table, $file = '');
+	public function delete($table, $file = "");
 	// Preload file in tmp dir (acces via JS)
-	public function preload ($field);
+	public function preload ($field, $replace = "");
 	// Upload file in DB
 	public function upload ($table, $field);
 	// Validate POST field
@@ -173,8 +173,8 @@ class FileField extends Field implements FileInterface {
 	
 	// Setters
 	// Delete file
-	public function delete($table, $file = '') {
-		if ($file == '') $file = $this->value;
+	public function delete($table, $file = "") {
+		if ($file == "") $file = $this->value;
 		else $file = DataManagement::secureText($file);
 		if (strpos ($file, self::PATH_UPLOAD[$table]) === false)
 			$file = self::PATH_UPLOAD[$table].$file;
@@ -187,16 +187,24 @@ class FileField extends Field implements FileInterface {
 	}
 
 	// Preload POST file in tmp dir (updload via JS)
-	public function preload ($field) {
+	public function preload ($field, $replace = "") {
 		// field is a regular posted file, just record it in temp directory and return full path to uploaded file
 		$err = $this->validatePostedFile ($field);
 		if ($err) {
-			array_push ($FileMgmt->Errors, $err);
+			echo $err;
 			return false;
 		}
 		$tmpFileName = $this->upload('tmp', $field);
-		if (!$tmpFileName) return false;
-		else echo self::PATH_UPLOAD['tmp'].$tmpFileName;
+		if (!$tmpFileName) {
+			echo $this->Errors[0];
+			return false;
+		}
+
+		echo self::PATH_UPLOAD['tmp'].$tmpFileName;
+		// delete last preloaded file if exists
+		if ($replace != "")
+			$this->delete ('tmp', $replace);
+		
 		return true;
 	}
 	
