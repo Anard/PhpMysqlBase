@@ -947,10 +947,6 @@ abstract class MysqlTable implements Table
 		$donnees = $reponse->fetch();
 		$reponse->closeCursor();
 		
-		if (!$donnees) {
-			array_push ($this->Errors, SQL_ERR::INSERT);
-			return false;
-		}
 		// Now insert data in authorised table
 		switch ($this->rights[ACCESS::WRITE]) {
 			case AUTHORISED::ASSO:

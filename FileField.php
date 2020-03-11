@@ -491,13 +491,17 @@ class UI_File implements UI_FileInterface {
 	function construct() { }
 	
 	// Methods
-	public static function draw_fieldset ($field, $table, $maxSize, $image = "") {
+	public static function draw_fieldset ($field, $table, $maxSize, $supportedTypes = [], $image = "") {
 		if (!is_numeric($maxSize)) return false;
 		if (!array_key_exists($table, FileField::PATH_UPLOAD)) return false;
+		$typesArray = array();
+		foreach ($supportedTypes as $supportedType)
+			$typesArray[] = $supportedType[0];
+		$types = implode (', ', $typesArray);
 		$image = FileField::PATH_UPLOAD[$table].$image;
 		if (!file_exists($image) || !is_file($image)) $image = "";
 		echo '<div class="container">';
-			echo '<p>Vous pouvez choisir une image (jpg, png, gif) pour illustrer la page (maximum '.$maxSize.'Mo).</p>';
+		echo '<p>Vous pouvez choisir une image ('.$types.') pour illustrer la page (maximum '.$maxSize.'Mo).</p>';
 			echo '<input type="hidden" name="MAX_FILE_SIZE" value="'.($maxSize * 1000000).'" />';
 			echo '<img id="imageupload" ';
 			if ($image != "") echo 'style="display: block;" ';
