@@ -5,7 +5,7 @@ require_once ('FileField.php');
 // ----------- GLOBAL Mysql Table INTERFACE to implement in child classes ------------
 interface Table {
 	// Set defaults and table
-	function __construct();
+	function __construct($read_write = ACCESS::__default);
 
 	// PUBLIC
 	// GETTERS
@@ -140,7 +140,7 @@ abstract class MysqlTable implements Table
 	protected $Table;				// name of Mysql base table with prefix
 	protected $Parent = NULL;		// Parent de la classe finalle éventuel
 	protected $parentItem; 			// nom de l'id du parent dans la BDD
-	protected $childsTables = array(); 	// Enfants de la classe finalle éventuels
+	protected $childTables = array(); 	// Enfants de la classe finalle éventuels
 	protected $rights = [	ACCESS::READ => AUTHORISED::__default,
 							ACCESS::WRITE => AUTHORISED::__default
 						];			// Droits
@@ -157,7 +157,7 @@ abstract class MysqlTable implements Table
 	private $Errors = [];
 
 	// Constructor => inherit : lien vers la table héritée)
-	function _constructInit ($table, $childsTables = [], $ordering = "", $limiting = "") {
+	function _constructInit ($table, $childTables = [], $ordering = "", $limiting = "") {
 		if ($this->Parent == NULL) {
 			$connecting = 'insideClass';
 			include ('../Config/connexion.php');
@@ -170,8 +170,8 @@ abstract class MysqlTable implements Table
 		// Init consts
 		$this->table = $table;
 		$this->Table = $prefixe.$table;
-		foreach ($childsTables as $childsTable)
-			array_push ($this->childsTables, $prefixe.$childsTable);
+		foreach ($childTables as $childTable)
+			array_push ($this->childTables, $childTable);
 		// Init fields
 		$reponse = $this->bdd->query('SHOW COLUMNS FROM '.$this->Table);
 		while ($donnees = $reponse->fetch()) {
@@ -197,8 +197,13 @@ abstract class MysqlTable implements Table
 				break;
 			}
 		}
+		
+		if (is_numeric($this->Fields['id']->Default) && $this->Fields['id']->Default > 0) {
+			if ((!isset($_GET[$loadGetVar])) || $_GET[$loadGetVar] == "")
+				return $this->load_id ($this->Fields['id']->Default);
+		}
 		if (isset($_GET[$loadGetVar]))
-			return $this->load_id ($_GET[$loadGetVar], $this->default_access);
+			return $this->load_id ($_GET[$loadGetVar]);
 		else return SQL_ERR::OK;
 	}
 
@@ -813,22 +818,23 @@ abstract class MysqlTable implements Table
 				include ('../Config/config.php');
 				$item = AUTHORISED::_ITEM[$this->rights[ACCESS::WRITE]];
 				// Delete children
-				foreach ($this->childsTables as $childTable) {
-					$reponse = $this->bdd->prepare ('DELETE FROM '.$childTable.' WHERE '.$item.' = :id');
-					$reponse->bindParam('id', $id, PDO::PARAM_INT);
-					$ret = $reponse->execute();
+				foreach ($this->childTables as $childTable) {
+					require_once ('../Classes/'.$childTable.'.php');
+					$child = new $childTable(ACCESS::WRITE);
+					$ret = $child->delete_parentsEntries($id);
+					$child = NULL;
 					if (!$ret) return $ret;
 				}
-				// Delete in authorised table, prevent deleting when deleting from a child
+				// Delete in authorised table//, prevent deleting when deleting from a child
 				$Table = $prefixe.AUTHORISED::_TABLE[$this->rights[ACCESS::WRITE]];
-				if ($Table == $this->Table) {
+				//if ($Table == $this->Table) {
 					$userid = SessionManagement::getSessId();
 					$reponse = $this->bdd->prepare('DELETE FROM '.$Table.' WHERE '.$item.' = :itemid AND id_user = :userid');
 					$reponse->bindParam('itemid', $id, PDO::PARAM_INT);
 					$reponse->bindParam('userid', $userid, PDO::PARAM_INT);
 					$ret = $reponse->execute();
 					$reponse->closeCursor();
-				}
+				//}
 				break;
 			default: break;
 		}
@@ -844,6 +850,26 @@ abstract class MysqlTable implements Table
 			return $ret;
 		}
 
+		return $ret;
+	}
+	
+	// Delete parent's entries
+	public function delete_parentsEntries ($parentId) {
+		if (!$this->Parent->is_data ($parentId)) return SQL_ERR::KO;
+		if (!$this->Parent->rights_control (ACCESS::WRITE, $parentId)) return SQL_ERR::ACCESS;
+		
+		$ret = SQL_ERR::OK;
+		$item = AUTHORISED::_ITEM[$this->Parent->rights[ACCESS::WRITE]];
+		$reponse = $this->bdd->prepare ('SELECT id FROM '.$this->Table.' WHERE '.$item.' = :id_parent');
+		$reponse->bindParam('id_parent', $parentId, PDO::PARAM_INT);
+		$ret = $reponse->execute();
+		if (!$ret) return $ret;
+		$entries = $reponse->fetchAll();
+		$reponse->closeCursor();
+		foreach ($entries as $entry) {
+			$ret = $this->delete_entry ($entry['id']);
+			if (!$ret) break;
+		}
 		return $ret;
 	}
 	
@@ -876,7 +902,7 @@ abstract class MysqlTable implements Table
 			case TYPE::PARENT:
 			case TYPE::NUM:
 			case TYPE::BOOL:
-				$reponse->bindParam('value', $value, PDO::PARAM_INT); break;
+				$reponse->bindParam('value', intval($value), PDO::PARAM_INT); break;
 				
 			default: $reponse->bindParam('value', $value, PDO::PARAM_STR); break;
 		}
@@ -928,7 +954,7 @@ abstract class MysqlTable implements Table
 				case TYPE::PARENT:
 				case TYPE::NUM:
 				case TYPE::BOOL:
-					$reponse->bindParam(strtolower($field), $value, PDO::PARAM_INT);
+					$reponse->bindParam(strtolower($field), intval($value), PDO::PARAM_INT);
 					break;	
 				default:
 					//$reponse->bindParam(strtolower($field), $value, PDO::PARAM_STR);
@@ -951,6 +977,7 @@ abstract class MysqlTable implements Table
 		switch ($this->rights[ACCESS::WRITE]) {
 			case AUTHORISED::ASSO:
 			case AUTHORISED::NEWS:
+				if (SessionManagement::isAdmin()) break;
 				include ('../Config/config.php');
 				$Table = $prefixe.AUTHORISED::_TABLE[$this->rights[ACCESS::WRITE]];
 				$item = AUTHORISED::_ITEM[$this->rights[ACCESS::WRITE]];
@@ -961,7 +988,6 @@ abstract class MysqlTable implements Table
 				$ret = ($reponse->execute());
 				$reponse->closeCursor();
 				if (!$ret) array_push ($this->Errors, SQL_ERR::INSERT);
-				break;
 			default: break;
 		}
 

@@ -88,6 +88,10 @@ class FileField extends Field implements FileInterface {
 		'thumbs'	=> '../Collection/Files/thumbs/',
 		'galerie'	=> '../Collection/Files/masters/'
 	);
+	const PREFIX_UPLOAD = array (
+		 'assos'		=> 'asso',
+		 'assos_pages'	=> 'chap'
+	);
 	const FILIGRANE = '../Administration/Images/logofiligrane.png';
 	// Fichiers temporaires considérés trop vieux
 	const DELAY_OLDFILE = 1800; // 1800s = 30min
@@ -236,7 +240,10 @@ class FileField extends Field implements FileInterface {
 		
 		$path = self::PATH_UPLOAD[$table];
 		$extension = strtolower(substr(strrchr($file['name'], '.'), 1));
-		$nom = $table.time().'.'.$extension;
+		if (isset(self::PREFIX_UPLOAD[$table]))
+			$prefix = self::PREFIX_UPLOAD[$table];
+		else $prefix = "";
+		$nom = $prefix.time().'.'.$extension;
 		
 		if ($field == $this->Preload->Name)
 			$move = rename($file['tmp_name'], $path.$nom);
