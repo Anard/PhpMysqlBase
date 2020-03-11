@@ -204,10 +204,10 @@ final class SessionManagement implements Session
 			if (!PREFS::hasKey($cookie)) continue;
 			$value = $cookie['default'];
 			switch ($cookie['type']) {
-				case TYPE::BOOL:
+				case TYPE::BOOL:	// checkboxes are sent only if checked, with value 'on'. Else value isn't sent in form
 					if (isset($_POST[$cookie['name']]) && $_POST[$cookie['name']] == 'on')
-						$value = true;
-					else $value = false;
+						$value = 1;
+					else $value = 0;
 					break;
 				
 				case TYPE::NUM:
@@ -222,8 +222,9 @@ final class SessionManagement implements Session
 					break;
 
 			}
-			if ((isset ($_COOKIE['name']) && $_COOKIE['name'] != $value) || $value != $cookie['default'])
-				setcookie ($cookie['name'], $_POST[$cookie['name']], $cookie['expire']);
+			
+			if ((isset ($_COOKIE[$cookie['name']]) && $_COOKIE[$cookie['name']] != $value) || $value != $cookie['default'])
+				setcookie ($cookie['name'], $value, time()+$cookie['expire']);
 		}
 	}
 
