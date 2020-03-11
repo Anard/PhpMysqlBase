@@ -32,6 +32,7 @@ class FILE_ERR extends FIELD_ERR {
 	const SIZE =	101;
 	const TYPE =	102;
 	const UPLOAD =	110;
+	const NOTSENT =	111;	// no file sent
 	
 	// Print error
 	public static function print_error ($error, $rplmtStr = '', $data = []) // $data is from getFileInfo()
@@ -54,7 +55,9 @@ class FILE_ERR extends FIELD_ERR {
 				echo '<h3 class="alert">Un erreur est survenue pendant le téléchargement de votre fichier</h3>';
 				echo '<p class="alert">Merci de bien vouloir réessayer plus tard.</p>';
 				break;
-			
+			case self::NOTSENT:
+				break;
+				
 			default:
 				return (parent::print_error ($error, $rplmtStr, $data));
 		}
@@ -249,12 +252,14 @@ class FileField extends Field implements FileInterface {
 		$field = DataManagement::secureText($field);
 		$err = FILE_ERR::OK;
 		// Contrôles préalables (erreurs PHP)
-		if (!isset($_FILES[$field])) $err = FILE_ERR::KO;
+		if (!isset($_FILES[$field]) || $_FILES[$field]['tmp_name'] == "") $err = FILE_ERR::NOTSENT;
 		elseif ($_FILES[$field]['error'] > 0) {
 			switch ($_FILES[$field]['error']) {
 				case UPLOAD_ERR_INI_SIZE:
 				case UPLOAD_ERR_FORM_SIZE:	$err = FILE_ERR::SIZE; break;
-				case UPLOAD_ERR_PARTIAL:	$err = FILE_ERR::UPLOAD; break;
+				case UPLOAD_ERR_PARTIAL:
+				case UPLOAD_ERR_NO_TMP_DIR:
+				case UPLOAD_ERR_CANT_WRITE:	$err = FILE_ERR::UPLOAD; break;
 				case UPLOAD_ERR_NO_FILE:	$err = FILE_ERR::NOFILE; break;
 				default:					$err = FILE_ERR::KO; break;
 			}
@@ -265,18 +270,19 @@ class FileField extends Field implements FileInterface {
 			$err = $this->validateFileData ($_FILES[$field]['tmp_name']);
 		
 		switch ($err) {
-			case FILE_ERR::KO:
+			case FILE_ERR::NOTSENT:
 			case FILE_ERR::NOFILE:
 				// try preload field
-				if (isset($_POST[$this->Preload->Name])) {
+				if (isset($_POST[$this->Preload->Name]) && $_POST[$this->Preload->Name] != "") {
 					unset ($_FILES[$field]);
 					$err = $this->validateFileData (DataManagement::secureText($_POST[$this->Preload->Name]));
 				}
-				// else continue to return error
+				// continue to return error
 			
 			case FILE_ERR::OK:
 			default: break;
 		}
+		
 		return $err;
 	}
 	

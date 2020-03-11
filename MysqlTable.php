@@ -905,12 +905,12 @@ abstract class MysqlTable implements Table
 				unset ($validatedValues[$field]);
 				continue;
 			}
-			if (sizeof($this->Fields[$field]->Errors) > 0) {
+			if (sizeof($this->Fields[$field]->Errors) > 0 && ($type != TYPE::FILE || sizeof($this->Fields[$field]->Errors) > 1 || $this->Fields[$field]->Errors[0] != FILE_ERR::NOTSENT)) {
 				unset ($value);
 				return false;
 			}
 			
-			if ($type == TYPE::FILE) {
+			if ($type == TYPE::FILE && sizeof($this->Fields[$field]->Errors) == 0) {
 				$value = $this->Fields[$field]->upload($this->table, $field);
 				if (!$value) $value = "";
 			}
