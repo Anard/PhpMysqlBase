@@ -1,6 +1,6 @@
 <?php
 require_once ('ErrorHandling.php');
-require_once ('DataManagement.php');
+require_once ('Field.php');
 	
 // INTERFACE for Session Management
 interface Session {
@@ -82,7 +82,7 @@ class SESS_ERR extends ERR {
 }
 
 // ECHECS
-abstract class ECHEC extends ExtdEnum {
+class ECHEC extends ExtdEnum {
 	const __default = self::NONE;
 	const NONE =	0;
 	const COOKIE =	1;
@@ -90,7 +90,7 @@ abstract class ECHEC extends ExtdEnum {
 }
 
 // COOKIES
-abstract class TICKET extends ExtdEnum {
+class TICKET extends ExtdEnum {
 	// Session's ticket
 	const SESSION = [	'name' =>	'passwd'
 					]; 
@@ -102,9 +102,10 @@ abstract class TICKET extends ExtdEnum {
 }
 
 // PREFERENCES
-abstract class PREFS extends ExtdEnum {
+class PREFS extends ExtdEnum {
 	// Apercu bb code à la frappe
 	const APERCU_BB = [	'name' =>		'bbLive',
+						'type' =>		TYPE::BOOL,
 						'expire' =>		(24 * 3600), // 1 day
 						'default' =>	true
 					]; 
@@ -192,16 +193,36 @@ final class SessionManagement implements Session
 	}
 
 	// Update Session's Login
-	public static function updateLogin($db) {
+	public static function updateLogin ($db) {
 		$user = self::getUserInfo ($db);
 		$_SESSION['Login'] = $user['Login'];
 	}
 	
 	// Update preferences
-	public static function updateCookies() {
-		$cookies = PREFS::getConstList();
+	public static function updateCookies ($cookies = []) {
 		foreach ($cookies as $cookie) {
-			if (isset ($_POST[$cookie['name']]) && is_numeric($_POST[$cookie['name']]))
+			if (!PREFS::hasKey($cookie)) continue;
+			$value = $cookie['default'];
+			switch ($cookie['type']) {
+				case TYPE::BOOL:
+					if (isset($_POST[$cookie['name']]) && $_POST[$cookie['name']] == 'on')
+						$value = true;
+					else $value = false;
+					break;
+				
+				case TYPE::NUM:
+					if (!isset($_POST[$cookie['name']])) break;
+					if (is_numeric($_POST[$cookie['name']]))
+						$value = $_POST[$cookie['name']];
+					break;
+				
+				default:
+					if (!isset($_POST[$cookie['name']])) break;
+					$value = DataManagement::seureText ($_POST[$cookie['name']]);
+					break;
+
+			}
+			if ((isset ($_COOKIE['name']) && $_COOKIE['name'] != $value) || $value != $cookie['default'])
 				setcookie ($cookie['name'], $_POST[$cookie['name']], $cookie['expire']);
 		}
 	}

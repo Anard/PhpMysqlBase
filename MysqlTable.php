@@ -1,6 +1,5 @@
 <?php
 require_once ('Session.php');
-require_once ('DataManagement.php');
 require_once ('FileField.php');
 
 // ----------- GLOBAL Mysql Table INTERFACE to implement in child classes ------------
@@ -148,11 +147,11 @@ abstract class MysqlTable implements Table
 	protected $Fields = array();	// List of fields
 	protected $bdd;					// bdd
 	protected $default_access;		// default ACCESS value
-	protected $FileMgmt = array();	// File management
 	// readable au niveau supérieur (getter)
 	protected $table;				// name of Mysql base table
 	private	$Ordering;				// default ordering of data
 	private $Limiting;				// default exclusion when getting data
+	private $Prefs = array();	// preference cookies on this table
 
 	// errors
 	private $Errors = [];
@@ -572,7 +571,7 @@ abstract class MysqlTable implements Table
 	// only final function is public (need at least to check 'action' first)
 	protected function _send_form () {
 		// record settings
-		SessionManagement::updateCookies();
+		SessionManagement::updateCookies($this->Prefs);
 		
 		// prepare data
 		$postedValues = array_merge ($_POST, $_FILES);
@@ -763,6 +762,12 @@ abstract class MysqlTable implements Table
 		}
 		
 		return ($this->Fields[$field] = new Field($type, $name, $default, $required, $unique));
+	}
+	
+	// Définition des préférences incluses aux formulaires
+	protected function set_pref ($cookie) {
+		if (PREFS::hasKey($cookie))
+			array_push ($this->Prefs, $cookie);	
 	}
 	
 	// Record validated values to DB

@@ -44,6 +44,8 @@ final class "Class"Table extends MysqlTable implements "Class"
 		// for child's class, id = NULL means we are working on parent, id = 0 if we are working on child
 		$this->set_field('id_parent', TYPE::PARENT);
 		$this->set_field('Field', "TYPE", 'name in print_errors functions', "default value", required", "unique");
+		// Init prefs
+		$this->set_pref ("PREF::USED");
 		
 		return parent::_constructExit($read_write, "LOAD_GET_VARIABLE_NAME (=idload)");
 	}
