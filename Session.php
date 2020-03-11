@@ -238,13 +238,10 @@ final class SessionManagement implements Session
 	
 	// Try to start session
 	public function startSession() {
-		$target = self::ADMIN_HOME;
 		// Check special target
-		if (isset($_POST['goto'])) {
-			
-			if (preg_match('#^((Users?([0-9]*))|(News([0-9]*))|(Asso(s)?([0-9]*)(-([0-9]*))?)|(Agenda([0-9]*))|(Agenda-([0-9]+))|(Galerie([0-9]*))|(Album([0-9]*))|(confirmDate-([0-9]+))(\.(php|html?)))$#', $_POST['goto']) > 0)
+		if (isset($_POST['goto']) && (preg_match('#^((Users?([0-9]*))|(News([0-9]*))|(Asso(s)?([0-9]*)(-([0-9]*))?)|(Agenda([0-9]*))|(Agenda-([0-9]+))|(Galerie([0-9]*))|(Album([0-9]*))|(confirmDate-([0-9]+)))(\.(php|html?))?$#', $_POST['goto']) > 0))
 				$target = $_POST['goto'];
-		}
+		else $target = self::ADMIN_HOME;
 		
 		// Try to connect
 		if (isset($_POST['login']) && isset($_POST['pwd'])) {
