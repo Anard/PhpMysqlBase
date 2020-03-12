@@ -1,5 +1,5 @@
 <?php
-require_once ('MysqlTable.php');
+require_once ('../ClassesBase/MysqlTable.php');
 
 class "CLASS"__ACTION extends ExtdEnum
 {
@@ -29,12 +29,19 @@ interface UI_"Class" extends UI_Table {
 // ---------- FINAL CLASS ------------
 final class "Class"Table extends MysqlTable implements "Class"
 {
+	// Constants
 	// Properties
+	public "Parent"
 
 	// Constructor
 	function __construct ($read_write = ACCESS::__default) {
-		if (parent::_constructInit('TABLE', 'ORDERING') !== true)
-			return ERR::KO;
+		// Define Parent first
+		$this->Parent = new "ParentTable" ($read_write);
+		if (headers_sent()) return false;
+		$this->"Parent" = &$this->Parent;
+		
+		if (parent::_constructInit('TABLE', ['ChildTable'], 'ORDERING', 'LIMITING') !== true)
+			return false;
 		
 		// Init rights
 		$this->rights[ACCESS::READ] = "READ ACCESS";
@@ -43,11 +50,16 @@ final class "Class"Table extends MysqlTable implements "Class"
 		$this->set_field('id', TYPE::ID, 'Name', 0);
 		// for child's class, id = NULL means we are working on parent, id = 0 if we are working on child
 		$this->set_field('id_parent', TYPE::PARENT);
-		$this->set_field('Field', "TYPE", 'name in print_errors functions', "default value", required", "unique");
+		$this->set_field('Field', "TYPE", 'name in print_errors functions', "default value", "required", "unique");
 		// Init prefs
 		$this->set_pref ("PREF::USED");
 		
 		return parent::_constructExit($read_write, "LOAD_GET_VARIABLE_NAME (=idload)");
+	}
+	
+	// Destructor (if parent)
+	function __destruct () {
+		$this->Parent = NULL;
 	}
 	
 	// --------- Override or Initialize Table methods ---------
@@ -60,7 +72,7 @@ final class "Class"Table extends MysqlTable implements "Class"
 			if ($_POST['action'] == "CLASS"_ACTION::DELETE)
 				return $this->delete_entry ($_POST['id']);
 			
-			else return $this->_send_form ($_POST);
+			else return $this->_send_form ();
 		}
 		elseif ($this->Parent !== NULL) return $this->Parent::send_form();
 		else return false;
@@ -88,7 +100,7 @@ final class UI_"Class"Table extends UI_MysqlTable implements UI_"Class"
 		echo '<form action="PAGE.PHP" method="post">';
 			echo '<fieldset>';
 				echo '<legend id="formTitle">';
-				echo self::replaceFields("CLASS"_ACTION::LEGEND[$action], $data);
+				echo SQL_ERR::replaceFields("CLASS"_ACTION::LEGEND[$action], $data);
 				echo '</legend>';
 			
 				echo '<input type="hidden" name="action" value="'.$action.'" required />';
