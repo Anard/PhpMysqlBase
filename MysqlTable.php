@@ -951,9 +951,16 @@ abstract class MysqlTable implements Table
 				return false;
 			}
 			
+			// Upload file
 			if ($type == TYPE::FILE && sizeof($this->Fields[$field]->Errors) == 0) {
 				$value = $this->Fields[$field]->upload($this->table, $field);
 				if (!$value) $value = "";
+			}
+			// Set initial position
+			if ($type == TYPE::POSITION) {
+				
+				
+			
 			}
 		
 			$echoValues[$field] = ':'.strtolower($field);
