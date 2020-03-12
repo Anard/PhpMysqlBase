@@ -901,15 +901,13 @@ abstract class MysqlTable implements Table
 			if (!$value) return false;
 			else $this->Fields[$field]->delete($this->table, $curValue);
 		}
+
+
 		// Edit position, $value is id of previous entry
-		elseif ($type == TYPE::POSITION) {
-			
-			
-			
-			
-		}
+		if ($type == TYPE::POSITION)
+			$value = $this->update_positions ($id, $value, $reponse);
 		
-		
+		// Prepare request
 		$reponse = $this->bdd->prepare('UPDATE '.$this->Table.' SET '.$field.' = :value WHERE id = :id');
 		switch ($this->Fields[$field]->Type) {
 			case TYPE::ID:
@@ -930,6 +928,45 @@ abstract class MysqlTable implements Table
 	}
 
 	// PRIVATE
+	// Update positions of all entries, $is = entry's id, $prevId = id of new previous entry, Return new value of TYPE::POSITION's field
+	private function update_positions ($id, prevId) {
+		$list = $this->get_data(GET::LIST, ['id, Position'], ACCESS_WRITE);
+		$curPos = 0;
+		// We rewind all entries to 0
+		// If it were edited, increment curPos to keep this difference
+		// lastPos save last recorded position, to see if current entry needs to increment curPos or not
+		$lastPos = $curPos;
+		// Prepare request
+		$reponse = $this->bdd->prepare('UPDATE '.$this->Table.' SET '.$field.' = :value WHERE id = :id');
+		
+		foreach ($list as $key => $data) {
+			if (!is_numeric($key)) continue;
+			if ($data['Position'] > $lastPos) {
+				$curPos++;
+				$lastPos = $data['Position'];
+			}
+			// Current : skip, it'll be done last
+			if (data['id'] == $id) continue;
+
+			// Update position
+			if ($data['Position'] != $curPos) {
+				$reponse->bindParam('id', $data['id'], PDO::PARAM_INT);
+				$reponse->bindParam('value', $curPos, PDO::PARAM_INT);
+				$reponse->execute();
+			}
+			
+			// Previous found, set current entry's value
+			if ($data['id'] == prevId) {
+				if ($data['id'] > $id)
+					$curPos++;
+				$thisPos = $curPos;
+				$curPos++;
+			}
+		}
+		if (!isset($thisPos)) return 0;
+		return $thisPos;
+	}
+	
 	// Insert full entry in DB, return false or ID of created entry
 	private function insert_data ($validatedValues) {
 		if (!$this->rights_control(ACCESS::WRITE, 0, SessionManagement::getSessId())) {
@@ -957,11 +994,8 @@ abstract class MysqlTable implements Table
 				if (!$value) $value = "";
 			}
 			// Set initial position
-			if ($type == TYPE::POSITION) {
-				
-				
-			
-			}
+			if ($type == TYPE::POSITION && $value > 0)
+				$value = $this->update_positions ($id, $value);
 		
 			$echoValues[$field] = ':'.strtolower($field);
 		}
