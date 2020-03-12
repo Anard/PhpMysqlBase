@@ -400,7 +400,7 @@ abstract class MysqlTable implements Table
 							'table' => $this->table,
 							'parentTable' => $this->Parent->table,
 							'currentId' => $this->getIdLoad(),
-							'parentId' => $this->Parent->Fields['id']->value,
+							'parentId' => $this->Parent->getIdLoad(),
 							'nombre' => $nombre,
 						);
 					}
@@ -511,7 +511,7 @@ abstract class MysqlTable implements Table
 					break;
 				}
 
-			// Get one ID
+			// Get single ID
 			default:
 				if (!$this->rights_control($read_write, $get)) return NULL;
 				if (!$this->is_data($get)) {
@@ -1032,7 +1032,8 @@ abstract class MysqlTable implements Table
 
 		if ($this->Parent === NULL || !is_numeric($this->getIdLoad()) || $this->getIdLoad() == 0) return SQL_ERR::OK;
 		// Load parent
-		return $this->Parent->load_id($this->get_data($this->getIdLoad(), $this->parentItem, $read_write), $read_write);
+		return $this->Parent->load_id($this->Fields[$this->parentItem]->value, $read_write);
+		//return $this->Parent->load_id($this->get_data($this->getIdLoad(), $this->parentItem, $read_write), $read_write);
 	}
 }
 
