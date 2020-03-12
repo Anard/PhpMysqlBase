@@ -506,6 +506,7 @@ class UI_File implements UI_FileInterface {
 			$typesArray[] = $supportedType[0];
 		$types = implode (', ', $typesArray);
 		$image = FileField::PATH_UPLOAD[$table].$image;
+		
 		if (!file_exists($image) || !is_file($image)) $image = "";
 		echo '<div class="container">';
 		echo '<p>Vous pouvez choisir une image ('.$types.') pour illustrer la page (maximum '.$maxSize.'Mo).</p>';

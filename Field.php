@@ -130,9 +130,12 @@ class TYPE extends ExtdEnum
 	const NONE =	-1;
 	const ID =		0;
 	const PARENT =	1;
-	const NUM =		2;
-	const BOOL =	3;
-	const TEXT =	4;
+	const POSITION = 2;
+	
+	const NUM =		3;
+	const BOOL =	4;
+	
+	const TEXT =	5;
 	
 	const MAIL =	10;
 	const TEL =		11;
@@ -194,6 +197,7 @@ class Field implements FieldInterface
 				return ($data ? true : false);
 			case TYPE::ID:
 			case TYPE::PARENT:
+			case TYPE::POSITION:
 			case TYPE::NUM:
 				return intval($data);
 
@@ -222,7 +226,8 @@ class Field implements FieldInterface
 			// ID and parent's types have to be ever checked, need access to db
 			case TYPE::ID:
 			case TYPE::PARENT:	return FIELD_ERR::KO;
-				
+			
+			case TYPE::POSITION:
 			case TYPE::NUM:		return (is_numeric($value) ? FIELD_ERR::OK : FIELD_ERR::NOTNUM);
 			case TYPE::BOOL:	return (is_bool($value) ? FIELD_ERR::OK : FIELD_ERR::NOTBOOL);
 			case TYPE::MAIL:	return (filter_var($value, FILTER_VALIDATE_EMAIL) ? FIELD_ERR::OK : FIELD_ERR::NOTMAIL);
@@ -267,6 +272,7 @@ class Field implements FieldInterface
 		switch ($this->Type) {
 			case TYPE::ID:
 			case TYPE::PARENT:
+			case TYPE::POSITION:
 			case TYPE::NUM:			return intval ($data);
 
 			case TYPE::DATE:		return DataManagement::formatDate($data);

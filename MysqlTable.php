@@ -582,6 +582,7 @@ abstract class MysqlTable implements Table
 		$postedValues = array_merge ($_POST, $_FILES);
 		
 		$validatedValues = $this->_validate_posted_data($this->secure_data($postedValues, true));
+
 		// post
 		return $this->_record_changes ($validatedValues);
 	}
@@ -625,6 +626,7 @@ abstract class MysqlTable implements Table
 		switch ($this->Fields[$field]->Type) {
 			case TYPE::ID:
 			case TYPE::PARENT:
+			case TYPE::POSITION:
 			case TYPE::NUM:
 			case TYPE::BOOL:
 				$reponse->bindParam('value', $value, PDO::PARAM_INT);
@@ -698,6 +700,7 @@ abstract class MysqlTable implements Table
 				case true:
 					switch ($this->Fields[$field]->Type) {
 						case TYPE::ID: case TYPE::PARENT: break;
+						case TYPE::POSITION:
 						case TYPE::NUM:
 							if ($value == 0 || $nbErrors > 0)
 								array_push($this->Fields[$field]->Errors, FIELD_ERR::NEEDED);
@@ -717,6 +720,7 @@ abstract class MysqlTable implements Table
 					if (isset ($isSet[$numId]) && $isSet[$numId] === true) break;
 					else {
 						switch ($this->Fields[$field]->Type) {
+							case TYPE::POSITION:
 							case TYPE::NUM:
 								$isSet[$numId] = ($value > 0 && $nbErrors == 0); break;
 							case TYPE::FILE:
@@ -759,6 +763,7 @@ abstract class MysqlTable implements Table
 					break;
 				case TYPE::COLOR:
 					DataManagement::randomColor(); break;
+				case TYPE::POSITION:
 				case TYPE::NUM:
 					$default = 0; break;
 				default:
@@ -890,16 +895,26 @@ abstract class MysqlTable implements Table
 		if ($value == $curValue) return false;
 		if ($type == TYPE::PASSWD && $value == "") return false;
 		
+		// Upload file
 		if ($type == TYPE::FILE) {
 			$value = $this->Fields[$field]->upload($this->table, $field);
 			if (!$value) return false;
 			else $this->Fields[$field]->delete($this->table, $curValue);
 		}
+		// Edit position, $value is id of previous entry
+		elseif ($type == TYPE::POSITION) {
+			
+			
+			
+			
+		}
+		
 		
 		$reponse = $this->bdd->prepare('UPDATE '.$this->Table.' SET '.$field.' = :value WHERE id = :id');
 		switch ($this->Fields[$field]->Type) {
 			case TYPE::ID:
 			case TYPE::PARENT:
+			case TYPE::POSITION:
 			case TYPE::NUM:
 			case TYPE::BOOL:
 				$reponse->bindParam('value', intval($value), PDO::PARAM_INT); break;
@@ -952,6 +967,7 @@ abstract class MysqlTable implements Table
 		foreach ($validatedValues as $field => $value) {
 			switch ($this->Fields[$field]->Type) {
 				case TYPE::PARENT:
+				case TYPE::POSITION:
 				case TYPE::NUM:
 				case TYPE::BOOL:
 					$reponse->bindParam(strtolower($field), intval($value), PDO::PARAM_INT);

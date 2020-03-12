@@ -74,7 +74,7 @@ final class "Class"Table extends MysqlTable implements "Class"
 			
 			else return $this->_send_form ();
 		}
-		elseif ($this->Parent !== NULL) return $this->Parent::send_form();
+		elseif ($this->Parent !== NULL) return $this->Parent->send_form();
 		else return false;
 	}
 	
