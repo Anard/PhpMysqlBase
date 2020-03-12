@@ -905,7 +905,7 @@ abstract class MysqlTable implements Table
 
 		// Edit position, $value is id of previous entry
 		if ($type == TYPE::POSITION)
-			$value = $this->update_positions ($id, $value, $reponse);
+			$value = $this->update_positions ($field, $id, $value);
 		
 		// Prepare request
 		$reponse = $this->bdd->prepare('UPDATE '.$this->Table.' SET '.$field.' = :value WHERE id = :id');
@@ -929,8 +929,8 @@ abstract class MysqlTable implements Table
 
 	// PRIVATE
 	// Update positions of all entries, $is = entry's id, $prevId = id of new previous entry, Return new value of TYPE::POSITION's field
-	private function update_positions ($id, prevId) {
-		$list = $this->get_data(GET::LIST, ['id, Position'], ACCESS_WRITE);
+	private function update_positions ($field, $id, $prevId) {
+		$list = $this->get_data(GET::LIST, ['id, Position'], ACCESS::WRITE);
 		$curPos = 0;
 		// We rewind all entries to 0
 		// If it were edited, increment curPos to keep this difference
@@ -995,7 +995,7 @@ abstract class MysqlTable implements Table
 			}
 			// Set initial position
 			if ($type == TYPE::POSITION && $value > 0)
-				$value = $this->update_positions ($id, $value);
+				$value = $this->update_positions ($field, $id, $value);
 		
 			$echoValues[$field] = ':'.strtolower($field);
 		}
