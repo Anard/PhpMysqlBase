@@ -894,8 +894,10 @@ abstract class MysqlTable implements Table
 			return false;
 		}
 		if (sizeof($this->Fields[$field]->Errors) > 0) return false;
-		$curValue = $this->get_data ($id, $field);
-		if ($value == $curValue) return false;
+		if ($type != TYPE::POSITION) {
+			$curValue = $this->get_data ($id, $field);
+			if ($value == $curValue) return false;
+		}
 		if ($type == TYPE::PASSWD && $value == "") return false;
 		
 		// Upload file
@@ -905,9 +907,8 @@ abstract class MysqlTable implements Table
 			else $this->Fields[$field]->delete($this->table, $curValue);
 		}
 
-
 		// Edit position, $value is id of previous entry
-		if ($type == TYPE::POSITION)
+		elseif ($type == TYPE::POSITION)
 			$value = $this->update_positions ($field, $id, $value);
 		
 		// Prepare request
@@ -1017,6 +1018,7 @@ abstract class MysqlTable implements Table
 	
 	// Update positions of all entries, $is = entry's id, $prevId = id of new previous entry, Return new value of TYPE::POSITION's field
 	private function update_positions ($field, $id, $prevId) {
+		$this->load_id($id);
 		$list = $this->get_data(GET::LIST, ['id', 'Position'], ACCESS::WRITE);
 		$curPos = 0;
 		// We rewind all entries to 0
@@ -1025,7 +1027,7 @@ abstract class MysqlTable implements Table
 		$lastPos = $curPos;
 		// Prepare request
 		$reponse = $this->bdd->prepare('UPDATE '.$this->Table.' SET '.$field.' = :value WHERE id = :id');
-		
+
 		foreach ($list as $key => $data) {
 			if (!is_numeric($key)) continue;
 			if ($data['Position'] > $lastPos) {
@@ -1033,7 +1035,7 @@ abstract class MysqlTable implements Table
 				$lastPos = $data['Position'];
 			}
 			// Current : skip, it'll be done last
-			if (data['id'] == $id) continue;
+			if ($data['id'] == $id) continue;
 
 			// Update position
 			if ($data['Position'] != $curPos) {
@@ -1043,8 +1045,8 @@ abstract class MysqlTable implements Table
 			}
 			
 			// Previous found, set current entry's value
-			if ($data['id'] == prevId) {
-				if ($data['id'] > $id)
+			if ($data['id'] == $prevId) {
+				if ($data['id'] < $id)
 					$curPos++;
 				$thisPos = $curPos;
 				$curPos++;
