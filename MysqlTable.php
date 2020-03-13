@@ -33,6 +33,8 @@ interface Table {
 	public function send_form (); // values are from form's POST variables
 	// Delete single file
 	public function deleteFile ($field, $id);
+	// Delete parent's entries
+	public function delete_parentsEntries ($parentId);
 }
 
 // UI for Table CLASS
@@ -127,7 +129,7 @@ class GET extends ExtdEnum {
 	// '*' value will get all in Sql requests when applied to fields
 	const __default = self::ALL;
 	const ALL =		'*';
-	const LIST =	-1;
+	const LIST =	'list';
 }
 
 // ---------- GLOBAL BASE CLASS ------------
@@ -348,6 +350,7 @@ abstract class MysqlTable implements Table
 		if (is_null($read_write)) $read_write = $this->default_access;
 		if (!ACCESS::hasKey($read_write)) return NULL;
 		if (!GET::hasKey($get) && !is_numeric($get)) $get = GET::__default;
+		
 		switch ($get) {
 			case GET::ALL:
 				if (!$this->rights_control($read_write)) return NULL;
@@ -604,6 +607,26 @@ abstract class MysqlTable implements Table
 		return ($reponse->execute() ? SQL_ERR::OK : SQL_ERR::UPDATE);
 	}
 	
+	// Delete parent's entries
+	public function delete_parentsEntries ($parentId) {
+		if (!$this->Parent->is_data ($parentId)) return SQL_ERR::KO;
+		if (!$this->Parent->rights_control (ACCESS::WRITE, $parentId)) return SQL_ERR::ACCESS;
+		
+		$ret = SQL_ERR::OK;
+		$item = AUTHORISED::_ITEM[$this->Parent->rights[ACCESS::WRITE]];
+		$reponse = $this->bdd->prepare ('SELECT id FROM '.$this->Table.' WHERE '.$item.' = :id_parent');
+		$reponse->bindParam('id_parent', $parentId, PDO::PARAM_INT);
+		$ret = $reponse->execute();
+		if (!$ret) return $ret;
+		$entries = $reponse->fetchAll();
+		$reponse->closeCursor();
+		foreach ($entries as $entry) {
+			$ret = $this->delete_entry ($entry['id']);
+			if (!$ret) break;
+		}
+		return $ret;
+	}
+
 
 	// ----------- INTERNAL METHODS ------------
 	// GETTERS
@@ -857,27 +880,7 @@ abstract class MysqlTable implements Table
 
 		return $ret;
 	}
-	
-	// Delete parent's entries
-	public function delete_parentsEntries ($parentId) {
-		if (!$this->Parent->is_data ($parentId)) return SQL_ERR::KO;
-		if (!$this->Parent->rights_control (ACCESS::WRITE, $parentId)) return SQL_ERR::ACCESS;
 		
-		$ret = SQL_ERR::OK;
-		$item = AUTHORISED::_ITEM[$this->Parent->rights[ACCESS::WRITE]];
-		$reponse = $this->bdd->prepare ('SELECT id FROM '.$this->Table.' WHERE '.$item.' = :id_parent');
-		$reponse->bindParam('id_parent', $parentId, PDO::PARAM_INT);
-		$ret = $reponse->execute();
-		if (!$ret) return $ret;
-		$entries = $reponse->fetchAll();
-		$reponse->closeCursor();
-		foreach ($entries as $entry) {
-			$ret = $this->delete_entry ($entry['id']);
-			if (!$ret) break;
-		}
-		return $ret;
-	}
-	
 	// Update field in DB, return true if field as been modified
 	protected function update_field ($id, $field, $value="") {
 		if (!array_key_exists($field, $this->Fields)) return false;
@@ -928,45 +931,6 @@ abstract class MysqlTable implements Table
 	}
 
 	// PRIVATE
-	// Update positions of all entries, $is = entry's id, $prevId = id of new previous entry, Return new value of TYPE::POSITION's field
-	private function update_positions ($field, $id, $prevId) {
-		$list = $this->get_data(GET::LIST, ['id, Position'], ACCESS::WRITE);
-		$curPos = 0;
-		// We rewind all entries to 0
-		// If it were edited, increment curPos to keep this difference
-		// lastPos save last recorded position, to see if current entry needs to increment curPos or not
-		$lastPos = $curPos;
-		// Prepare request
-		$reponse = $this->bdd->prepare('UPDATE '.$this->Table.' SET '.$field.' = :value WHERE id = :id');
-		
-		foreach ($list as $key => $data) {
-			if (!is_numeric($key)) continue;
-			if ($data['Position'] > $lastPos) {
-				$curPos++;
-				$lastPos = $data['Position'];
-			}
-			// Current : skip, it'll be done last
-			if (data['id'] == $id) continue;
-
-			// Update position
-			if ($data['Position'] != $curPos) {
-				$reponse->bindParam('id', $data['id'], PDO::PARAM_INT);
-				$reponse->bindParam('value', $curPos, PDO::PARAM_INT);
-				$reponse->execute();
-			}
-			
-			// Previous found, set current entry's value
-			if ($data['id'] == prevId) {
-				if ($data['id'] > $id)
-					$curPos++;
-				$thisPos = $curPos;
-				$curPos++;
-			}
-		}
-		if (!isset($thisPos)) return 0;
-		return $thisPos;
-	}
-	
 	// Insert full entry in DB, return false or ID of created entry
 	private function insert_data ($validatedValues) {
 		if (!$this->rights_control(ACCESS::WRITE, 0, SessionManagement::getSessId())) {
@@ -1051,6 +1015,45 @@ abstract class MysqlTable implements Table
 		return $donnees['id'];
 	}
 	
+	// Update positions of all entries, $is = entry's id, $prevId = id of new previous entry, Return new value of TYPE::POSITION's field
+	private function update_positions ($field, $id, $prevId) {
+		$list = $this->get_data(GET::LIST, ['id', 'Position'], ACCESS::WRITE);
+		$curPos = 0;
+		// We rewind all entries to 0
+		// If it were edited, increment curPos to keep this difference
+		// lastPos save last recorded position, to see if current entry needs to increment curPos or not
+		$lastPos = $curPos;
+		// Prepare request
+		$reponse = $this->bdd->prepare('UPDATE '.$this->Table.' SET '.$field.' = :value WHERE id = :id');
+		
+		foreach ($list as $key => $data) {
+			if (!is_numeric($key)) continue;
+			if ($data['Position'] > $lastPos) {
+				$curPos++;
+				$lastPos = $data['Position'];
+			}
+			// Current : skip, it'll be done last
+			if (data['id'] == $id) continue;
+
+			// Update position
+			if ($data['Position'] != $curPos) {
+				$reponse->bindParam('id', $data['id'], PDO::PARAM_INT);
+				$reponse->bindParam('value', $curPos, PDO::PARAM_INT);
+				$reponse->execute();
+			}
+			
+			// Previous found, set current entry's value
+			if ($data['id'] == prevId) {
+				if ($data['id'] > $id)
+					$curPos++;
+				$thisPos = $curPos;
+				$curPos++;
+			}
+		}
+		if (!isset($thisPos)) return 0;
+		return $thisPos;
+	}
+
 	// Secure full array for printing, set $record = true destination is DB
 	protected function secure_data ($data, $record = false) {
 		foreach ($data as $field => &$value) {
