@@ -820,7 +820,7 @@ abstract class MysqlTable implements Table
 			$this->load_id ($validatedValues['id']);
 			return $ret;
 		}
-		
+				
 		return false;
 	}
 
