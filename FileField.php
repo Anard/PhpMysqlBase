@@ -147,7 +147,8 @@ class FileField extends Field implements FileInterface {
 		return self::PRELOAD_FILENAME.'_'.DataManagement::secureText($field);
 	}
 
-	// PUBLIC	
+	// OVERRIDE Field's methods
+	// PUBLIC
 	public function print_errors($data = []) {
 		$data = array_merge ($data, $this->getFileInfo());
 		foreach ($this->Errors as $error) {
@@ -156,7 +157,7 @@ class FileField extends Field implements FileInterface {
 		return false;
 	}
 	
-	// OVERRIDE Field's methods
+	// go to validatePostedFile
 	public function isValidValue ($field) {
 		return $this->validatePostedFile ($field);
 	}
@@ -269,7 +270,7 @@ class FileField extends Field implements FileInterface {
 				default:					$err = FILE_ERR::KO; break;
 			}
 		}
-		
+			
 		// try to validate this file
 		if ($err == FILE_ERR::OK)
 			$err = $this->validateFileData ($_FILES[$field]['tmp_name']);
@@ -288,6 +289,8 @@ class FileField extends Field implements FileInterface {
 			default: break;
 		}
 		
+		
+		echo 'final err = '.$err.'<br />';
 		return $err;
 	}
 	

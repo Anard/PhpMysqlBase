@@ -681,7 +681,7 @@ abstract class MysqlTable implements Table
 				
 			case TYPE::FILE:
 				$err = $this->Fields[$field]->isValidValue ($field);
-				if ($err == FIELD_ERR::OK) break;
+				if ($err == FILE_ERR::OK) break;
 				else return $err;
 			default:
 				$err = $this->Fields[$field]->isValidValue ($value);
@@ -730,8 +730,14 @@ abstract class MysqlTable implements Table
 								array_push($this->Fields[$field]->Errors, FIELD_ERR::NEEDED);
 							break;
 						case TYPE::FILE:
-							if ($nbErrors > 0)
-								array_push ($this->Fields[$field]->Errors, FIELD_ERR::NEEDED);
+							if ($nbErrors > 0) {
+								if ($nbErrors == 1 && $this->Fields[$field]->Errors[0] == FILE_ERR::NOTSENT) {
+									// search valid value on this entry
+									$curValue = $this->get_data ($postedValues['id'], $field);
+									if (!$curValue || $curValue == "") array_push ($this->Fields[$field]->Errors, FIELD_ERR::NEEDED);
+								}
+							}
+							break;
 							
 						default:
 							if ($value == "" || $nbErrors > 0)

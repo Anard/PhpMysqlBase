@@ -243,7 +243,7 @@ class Field implements FieldInterface
 		}
 	}
 	
-	// Validate posted value to recording (requested value or default if error recorded)
+	// Validate posted value for recording (return formatted value or default if error recorded)
 	public function validate_data ($value) {
 		$nbErrors = sizeof ($this->Errors);
 		switch ($this->Type) {
