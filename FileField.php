@@ -12,7 +12,7 @@ interface FileInterface {
 	// Get current File object
 	public function getFileInfo ();
 	// Delete file
-	public function delete($table, $file = "");
+	public function delete ($table, $file);
 	// Preload file in tmp dir (acces via JS)
 	public function preload ($field, $replace = "");
 	// Upload file in DB
@@ -117,9 +117,9 @@ class FileField extends Field implements FileInterface {
 	// Properties
 	public $Types = [ FILE_TYPE::__default ];
 	public $MaxSize;	// Taille max des fichiers
+	public $type = FILE_TYPE::__default;	// final type
 	// Internal
 	private $Preload = NULL;				// preload field
-	public $type = FILE_TYPE::__default;	// final type
 
 	// Construct : list of supported types, maxSize (Mo)
 	function __construct ($field, $name = '', $okTypes = [], $maxSize, $default = NULL, $required = false, $unique = false) {
@@ -164,8 +164,7 @@ class FileField extends Field implements FileInterface {
 	// SPECIFICS
 	// Getters
 	public function getFileInfo ($path = '') {
-		if ($path == '') $path = $this->value;
-		$path = substr ($path, strripos ($path, '/') + 1);
+	$path = substr ($path, strripos ($path, '/') + 1);
 
 		foreach ($this->Types as $types)
 			$arrayTypes[] = implode (', ', $types);
@@ -180,9 +179,8 @@ class FileField extends Field implements FileInterface {
 	
 	// Setters
 	// Delete file
-	public function delete($table, $file = "") {
-		if ($file == "") $file = $this->value;
-		else $file = DataManagement::secureText($file);
+	public function delete($table, $file) {
+		$file = DataManagement::secureText($file);
 		if (strpos ($file, self::PATH_UPLOAD[$table]) === false)
 			$file = self::PATH_UPLOAD[$table].$file;
 
@@ -324,7 +322,6 @@ class FileField extends Field implements FileInterface {
 		}
 
 		if (!$handlers) return FILE_ERR::TYPE;
-		$this->value = $src;
 		$this->type = $handlers;
 		
 		return FILE_ERR::OK;
@@ -338,10 +335,10 @@ class FileField extends Field implements FileInterface {
 	 * @param $recouvr - pourcentage de recouvrement
 	 * @param $transp - opacité à appliquer en pourcent (désactivé)
 	 */
-	private function signImage ($bottom=0, $right=0, $recouvr=30, $transp=15) {
+	private function signImage ($src, $bottom=0, $right=0, $recouvr=30, $transp=15) {
 		if ($this->File == NULL) return NULL;
 
-		$image = call_user_func($this->type['load'], $this->value);
+		$image = call_user_func($this->type['load'], $src);
 		if (!$image) return null;
 
 		$logo = imagecreatefrompng(self::FILIGRANE);
@@ -397,7 +394,7 @@ class FileField extends Field implements FileInterface {
 		return call_user_func(
 		    $this->type['save'],
 		    $image,
-		    $this->value,
+		    $src,
 		    $this->type['quality']
 		);
 	}
@@ -408,7 +405,7 @@ class FileField extends Field implements FileInterface {
 	 * @param $targetWidth - desired output width
 	 * @param $targetHeight - desired output height or null
 	 */
-	private function createThumbnail ($dest, $targetWidth, $targetHeight = null) {
+	private function createThumbnail ($src, $dest, $targetWidth, $targetHeight = null) {
 		// 1. Load the image from the given $src
 		// - see if the file actually exists
 		// - check if it's of a valid image type
@@ -421,7 +418,7 @@ class FileField extends Field implements FileInterface {
 		//    return null;
 		//}
 		// load the image with the correct loader
-		$image = call_user_func($this->type['load'], $this->value);
+		$image = call_user_func($this->type['load'], $src);
 		// no image found at supplied location -> exit
 		if (!$image) return null;
 		// 2. Create a thumbnail and resize the loaded $image
@@ -486,7 +483,7 @@ class FileField extends Field implements FileInterface {
 			);
 		}
 		else {
-			if ($this->value != $dest) return copy($this->value, $dest);
+			if ($src != $dest) return copy($src, $dest);
 			else return 1;
 		}
 	}

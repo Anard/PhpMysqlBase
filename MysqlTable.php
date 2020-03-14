@@ -125,11 +125,12 @@ class ACCESS extends ExtdEnum {
 }
 // Get values
 class GET extends ExtdEnum {
-	// default is ID of wanted data
+	// default is table's loadId
 	// '*' value will get all in Sql requests when applied to fields
-	const __default = self::ALL;
-	const ALL =		'*';
+	const __default = self::SELF;
+	const SELF =	'self';
 	const LIST =	'list';
+	const ALL =		'*';
 }
 
 // ---------- GLOBAL BASE CLASS ------------
@@ -151,6 +152,7 @@ abstract class MysqlTable implements Table
 	protected $default_access;		// default ACCESS value
 	// readable au niveau supérieur (getter)
 	protected $table;				// name of Mysql base table
+	protected $idLoad;				// page loaded Id
 	private	$Ordering;				// default ordering of data
 	private $Limiting;				// default exclusion when getting data
 	private $Prefs = array();	// preference cookies on this table
@@ -217,10 +219,8 @@ abstract class MysqlTable implements Table
 	// ------------ GLOBAL INTERFACE METHODS ----------- //
 	// GETTERS
 	public function print_errors () {
-		$data = [];
-		foreach ($this->Fields as $field => &$Field)
-			$data[$field] = $Field->value;
-		unset ($Field);
+		$data = $this->get_data();
+
 		foreach ($this->Errors as $error) {
 			if (SQL_ERR::print_error ($error, $this->Fields['id']->Name, $data) !== false) return true;
 		}
@@ -258,7 +258,7 @@ abstract class MysqlTable implements Table
 
 	// Get current ID
 	public function getIdLoad() {
-		return $this->Fields['id']->value;
+		return $this->idLoad;
 	}
 	
 	// Is default access ACCESS::WRITE ?
@@ -350,6 +350,7 @@ abstract class MysqlTable implements Table
 		if (is_null($read_write)) $read_write = $this->default_access;
 		if (!ACCESS::hasKey($read_write)) return NULL;
 		if (!GET::hasKey($get) && !is_numeric($get)) $get = GET::__default;
+		if ($get == GET::__default) $get = $this->idLoad;
 		
 		switch ($get) {
 			case GET::ALL:
@@ -388,7 +389,7 @@ abstract class MysqlTable implements Table
 				if ($this->Parent !== NULL) {
 					if ($this->Limiting != "") $limit = ' AND '.$this->Limiting;
 					$reponse = $this->bdd->prepare('SELECT '.$fields.' FROM '.$this->Table.' WHERE '.$this->parentItem.' = :parent'.$limit.$this->getOrdering());
-					$reponse->bindParam('parent', $this->Parent->Fields['id']->value, PDO::PARAM_INT);
+					$reponse->bindParam('parent', $this->Parent->idLoad, PDO::PARAM_INT);
 					$reponse->execute();
 					$donnees = $reponse->fetchAll();
 					$reponse->closeCursor();
@@ -591,13 +592,13 @@ abstract class MysqlTable implements Table
 	}
 	
 	// Delete single file, would be bettter to ass bu a real form and send_form function
-	public function deleteFile ($field = "", $id = 0) {
+	public function deleteFile ($field = "", $id = GET::__default) {
 		if (!$this->rights_control(ACCESS::WRITE, $id))
 			return SQL_ERR::ACCESS;
 		if (!array_key_exists($_POST['field'], $this->Fields) || $this->Fields[$_POST['field']]->Type != TYPE::FILE)
 			return SQL_ERR::KO;
-		if (!$this->is_data($id))
-			return FIELD_ERR::UNKNOWN;
+		if ($id == GET::_default) $id = $this->idLoad;
+		if (!$this->is_data($id)) return FIELD_ERR::UNKNOWN;
 		
 		$path = $this->get_data ($id, $field);
 		$this->Fields[$field]->delete($this->table, $path);
@@ -882,13 +883,14 @@ abstract class MysqlTable implements Table
 	}
 		
 	// Update field in DB, return true if field as been modified
-	protected function update_field ($id, $field, $value="") {
+	protected function update_field ($id = GET::__default, $field, $value="") {
 		if (!array_key_exists($field, $this->Fields)) return false;
 		$type = $this->Fields[$field]->Type;
 		if (!$this->rights_control(ACCESS::WRITE, $id)) {
 			array_push ($this->Errors, SQL_ERR::ACCESS);
 			return false;
 		}
+		if ($id == GET::__default) $id = $this->idLoad;
 		if (!$this->is_data($id)) {
 			array_push ($this->Fields['id']->Errors, FIELD_ERR::UNKNOWN);
 			return false;
@@ -1074,28 +1076,21 @@ abstract class MysqlTable implements Table
 		if (!ACCESS::hasKey($read_write)) return SQL_ERR::ACCESS;
 		// If Parent is defined, loadid = NULL if working on parent, loadid = 0 if working on child, these 2 values are valid even if no data
 		if ($this->Parent !== NULL && ($loadid === NULL || $loadid == 0))
-			$this->Fields['id']->value = $loadid;
+			$this->idLoad = $loadid;
 		
 		elseif ($loadid && is_numeric($loadid) && $loadid > 0) {
-			if ($this->is_data($loadid)) {
-				if ($this->rights_control($read_write, $loadid)) {
-					$data = $this->get_data ($loadid, GET::ALL, $read_write);
-					foreach ($this->Fields as $field => &$Field)
-						$Field->value = $data[$field];
-					unset ($Field);
-				}
-				else {
-					if (!headers_sent()) header ('HTTP/1.1 401 Unauthorized');
-					array_push ($this->Errors, SQL_ERR::ACCESS);
-					return SQL_ERR::ACCESS;
-				}
+			if ($this->is_data($loadid) && $this->rights_control($read_write, $loadid))
+				$this->idLoad = $loadid;
+			else {
+				if (!headers_sent()) header ('HTTP/1.1 401 Unauthorized');
+				array_push ($this->Errors, SQL_ERR::ACCESS);
+				return SQL_ERR::ACCESS;
 			}
 		}
 
-		if ($this->Parent === NULL || !is_numeric($this->getIdLoad()) || $this->getIdLoad() == 0) return SQL_ERR::OK;
+		if ($this->Parent === NULL || !is_numeric($this->idLoad) || $this->idLoad == 0) return SQL_ERR::OK;
 		// Load parent
-		return $this->Parent->load_id($this->Fields[$this->parentItem]->value, $read_write);
-		//return $this->Parent->load_id($this->get_data($this->getIdLoad(), $this->parentItem, $read_write), $read_write);
+	return $this->Parent->load_id($this->get_data($this->idLoad, $this->parentItem, $read_write), $read_write);
 	}
 }
 

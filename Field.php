@@ -10,7 +10,7 @@ interface FieldInterface {
 	public function secure_data ($data, $record = false);
 	// Contrôle de la validité d'un champ, return error
 	public function isValidValue ($value);
-	// Validate posted value for recording (requested value or default if error recorded) and update $this->value to update form too
+	// Validate posted value for recording (requested value or default if error recorded)
 	public function validate_data ($value);
 }
 
@@ -158,7 +158,6 @@ class Field implements FieldInterface
 	public $Unique = false;
 	public $Errors = array();
 	public $Default = NULL;
-	public $value = NULL;		// value is loaded from DB
 	
 	function __construct ($type = TYPE::__default, $name = '', $default = NULL, $required = false, $unique = false) {
 		$this->Type = TYPE::getKey($type);
@@ -259,13 +258,11 @@ class Field implements FieldInterface
 				if ($nbErrors > 0 && ($nbErrors > 1 || $this->Errors[0] != FIELD_ERR::NEEDED))
 					break;
 				else {
-					$this->value = $this->formatData($value);
-					return $this->value;
+					return $this->formatData($value);
 				}
 		}
 		
-		$this->value = $this->Default;
-		return $this->value;
+		return $this->Default;
 	}
 	
 	private function formatData ($data) {
