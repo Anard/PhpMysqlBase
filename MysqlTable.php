@@ -347,7 +347,7 @@ abstract class MysqlTable implements Table
 			$ID = $this->parentItem;
 		}
 		else $ID = 'id';
-		$reponse = $this->bdd->prepare('SELECT id FROM '.$this->Table.' WHERE '.$ID.' = :id');
+		$reponse = $this->bdd->prepare('SELECT '.$ID.' FROM '.$this->Table.' WHERE '.$ID.' = :id');
 		$reponse->bindParam('id', $id, PDO::PARAM_INT);
 		$reponse->execute();
 		$donnees = $reponse->fetch();
@@ -838,12 +838,12 @@ abstract class MysqlTable implements Table
 		if (!isset($this->Fields['id'])) {
 			if (!is_object($this->Parent)) return SQL_ERR::KO;
 			$ID = $this->parentItem;
-			if (is_data($_POST[$ID])) {
+			if ($this->is_data($_POST[$ID])) {
 				if (sizeof($this->Fields[$ID]->Errors) == 0) {
 					$ret = false;	// $ret is true if one modif executed
 					$modify = false;
 					foreach ($validatedValues as $field => $value) {
-						if ($field = $ID) contine;
+						if ($field = $ID) continue;
 						// Update
 						if (array_key_exists($field, $this->Fields)) {
 							$modify = true;
@@ -1014,7 +1014,9 @@ abstract class MysqlTable implements Table
 			array_push ($this->Errors, SQL_ERR::ACCESS);
 			return false;
 		}
-		if (sizeof($this->Fields['id']->Errors) > 0)
+		if (!isset($this->Fields['id'])) $ID = $this->parentItem;
+		else $ID = 'id';
+		if (sizeof($this->Fields[$ID]->Errors) > 0)
 			return false;
 
 		$echoValues = [];
@@ -1067,7 +1069,7 @@ abstract class MysqlTable implements Table
 			return false;
 		}
 		
-		$reponse = $this->bdd->query('SELECT id FROM '.$this->Table.' ORDER BY id DESC LIMIT 1');
+		$reponse = $this->bdd->query('SELECT '.$ID.' FROM '.$this->Table.' ORDER BY '.$ID.' DESC LIMIT 1');
 		$donnees = $reponse->fetch();
 		$reponse->closeCursor();
 		
@@ -1089,7 +1091,7 @@ abstract class MysqlTable implements Table
 			default: break;
 		}
 
-		return $donnees['id'];
+		return $donnees[$ID];
 	}
 	
 	// Update positions of all entries, $is = entry's id, $prevId = id of new previous entry, Return new value of TYPE::POSITION's field
