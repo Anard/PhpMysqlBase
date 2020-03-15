@@ -562,7 +562,7 @@ abstract class MysqlTable implements Table
 				}
 				if ($donnees) {
 					// tranform array $donnees in single value;
-					if ($fields != GET::ALL && !is_array($fields)) $donnees = $this->Fields[$fields]->secure_data ($donnees[$fields]);
+					if ($fields != GET::ALL && !isset($arrayFields)) $donnees = $this->Fields[$fields]->secure_data ($donnees[$fields]);
 					else $donnees = $this->secure_data($donnees);
 				}
 				break;
