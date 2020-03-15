@@ -27,7 +27,7 @@ interface Table {
 	
 	// Admin list
 	// Check if authorised on multiple entries
-	public function need_list ();
+	public function need_list ($read_write = NULL);
 	
 	// SETTERS
 	public function send_form (); // values are from form's POST variables
@@ -43,7 +43,7 @@ interface UI_Table {
 	public static function draw_fieldset ($action, $data, $table);
 	
 	// Draw admin list
-	public static function draw_list ($list, $deploy = true, $deleteButtons = false);
+	public static function draw_list ($list, $deploy = true, $read_write = ACCESS::__default);
 }
 
 // ERRORS
@@ -193,7 +193,6 @@ abstract class MysqlTable implements Table
 		return true;
 	}
 	function _constructExit ($read_write = ACCESS::__default, $loadGetVar = 'idload') {
-		if (!array_key_exists('id', $this->Fields)) return SQL_ERR::KO;
 		$this->default_access = ACCESS::getKey($read_write);
 		foreach ($this->Fields as $field => $Field) {
 			if ($Field->Type == TYPE::PARENT) {
@@ -201,7 +200,8 @@ abstract class MysqlTable implements Table
 				break;
 			}
 		}
-		
+
+		if (!array_key_exists('id', $this->Fields)) return SQL_ERR::OK;
 		if (is_numeric($this->Fields['id']->Default) && $this->Fields['id']->Default > 0) {
 			if ((!isset($_GET[$loadGetVar])) || $_GET[$loadGetVar] == "")
 				return $this->load_id ($this->Fields['id']->Default);
@@ -1158,7 +1158,7 @@ abstract class UI_MysqlTable implements UI_Table
 			echo '</h3>';
 	}
 	
-	protected static function _draw_list_block ($supprAction, $list, $deleteButtons = false) {
+	protected static function _draw_list_block ($supprAction, $list, $read_write = ACCESS::__default) {
 		foreach ($list as $donnees) {
 			if ($donnees == $list['listData']) continue;
 			do {
@@ -1183,7 +1183,7 @@ abstract class UI_MysqlTable implements UI_Table
 			else $dest = substr($_SERVER['SCRIPT_NAME'], 0, -4);
 			$dest .= $donnees['id']; 
 
-			if ($deleteButtons)
+			if ($read_write == ACCESS::WRITE)
 				self::_draw_delete_form($supprAction, $donnees, $table);
 			
 			echo '<a onclick="loadContent('.$donnees['id'].', \''.$table.'\'); return false;" ';

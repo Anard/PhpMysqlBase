@@ -37,7 +37,7 @@ final class "Class"Table extends MysqlTable implements "Class"
 	function __construct ($read_write = ACCESS::__default) {
 		// Define Parent first
 		$this->Parent = new "ParentTable" ($read_write);
-		if (headers_sent()) return false;
+		if (!$this->Parent) return false;
 		$this->"Parent" = &$this->Parent;
 		
 		if (parent::_constructInit('TABLE', ['ChildTable'], 'ORDERING', 'LIMITING') !== true)
@@ -111,9 +111,9 @@ final class UI_"Class"Table extends UI_MysqlTable implements UI_"Class"
 	
 	// Admin list
 	// Draw list
-	public static function draw_list ($list, $deploy = true, $deleteButtons = false) {
+	public static function draw_list ($list, $deploy = true, $read_write = ACCESS::__default) {
 		self::_draw_list_header ($list['listData'], sizeof($list)-1, $deploy);
-		self::_draw_list_block ("CLASS"_ACTION::DELETE, $list, $deleteButtons);
+		self::_draw_list_block ("CLASS"_ACTION::DELETE, $list, $read_write);
 		self::_draw_list_nav ($list['listData'], sizeof($list)-1, $deploy);
 	}
 	
