@@ -283,6 +283,11 @@ abstract class MysqlTable implements Table
 		if (!ACCESS::hasKey($read_write)) return false;
 		if (!is_numeric($id)) $id = 0;
 		if (!is_numeric($userid)) $userid = 0;
+		if (!isset($this->Fields['id'])) {
+			if (!is_object($this->Parent)) return SQL_ERR::KO;
+			$ID = $this->parentItem;
+		}
+		else $ID = 'id';
 		if (!$this->is_data($id)) $id = 0;	// do not block if id doesn't exist
 		if ($id == 0) {
 			if ($this->rights[$read_write] == AUTHORISED::SELF)	return false;
@@ -293,7 +298,7 @@ abstract class MysqlTable implements Table
 		if ($userid == 0) $userid = SessionManagement::getSessId();
 		else {
 			$Table = $prefixe.'users';
-			$reponse = $this->bdd->prepare ('SELECT Admin FROM '.$Table.' WHERE id = :userid');
+			$reponse = $this->bdd->prepare ('SELECT Admin FROM '.$Table.' WHERE '.$ID.' = :userid');
 			$reponse->bindParam ('userid', $userid, PDO::PARAM_INT);
 			$reponse->execute();
 			$donnees = $reponse->fetch();
@@ -304,7 +309,7 @@ abstract class MysqlTable implements Table
 		switch ($this->rights[$read_write]) {
 			case AUTHORISED::SELF:
 				if ($id != SessionManagement::getSessId()) return false;
-				$test = $this->bdd->prepare('SELECT id FROM '.$this->Table.' WHERE id = :userid');
+				$test = $this->bdd->prepare('SELECT id FROM '.$this->Table.' WHERE '.$ID.' = :userid');
 				break;
 			case AUTHORISED::MMM:
 			case AUTHORISED::ASSO:
@@ -337,7 +342,12 @@ abstract class MysqlTable implements Table
 	
 	// Search if data exists from DB
 	public function is_data ($id = 0) {
-		$reponse = $this->bdd->prepare('SELECT id FROM '.$this->Table.' WHERE id = :id');
+		if (!isset($this->Fields['id'])) {
+			if (!is_object($this->Parent)) return false;
+			$ID = $this->parentItem;
+		}
+		else $ID = 'id';
+		$reponse = $this->bdd->prepare('SELECT id FROM '.$this->Table.' WHERE '.$ID.' = :id');
 		$reponse->bindParam('id', $id, PDO::PARAM_INT);
 		$reponse->execute();
 		$donnees = $reponse->fetch();
@@ -351,6 +361,12 @@ abstract class MysqlTable implements Table
 		if (!ACCESS::hasKey($read_write)) return NULL;
 		if (!GET::hasKey($get) && !is_numeric($get)) $get = GET::__default;
 		if ($get == GET::__default) $get = $this->idLoad;
+		// pas d'id, on travaille sur une entrée existante ou non sur le parent
+		if (!isset($this->Fields['id'])) {
+			if (!is_object($this->Parent)) return NULL;
+			$ID = $this->parentItem;
+		}
+		else $ID = 'id';
 		
 		switch ($get) {
 			case GET::ALL:
@@ -438,7 +454,7 @@ abstract class MysqlTable implements Table
 							if (sizeof($ids) == 0) return NULL;
 							
 							if ($this->Limiting != "") $limit = ' AND '.$this->Limiting;
-							$reponse = $this->bdd->prepare ('SELECT '.$fields.' FROM '.$this->Table.' WHERE id REGEXP :ids'.$limit.$this->getOrdering().' LIMIT :nombre OFFSET :debut');
+							$reponse = $this->bdd->prepare ('SELECT '.$fields.' FROM '.$this->Table.' WHERE '.$ID.' REGEXP :ids'.$limit.$this->getOrdering().' LIMIT :nombre OFFSET :debut');
 							$reponse->bindValue('ids', '^('.implode('|', $ids).')$');
 							break;
 												
@@ -460,7 +476,7 @@ abstract class MysqlTable implements Table
 							if (sizeof($ids) == 0) return NULL;
 							
 							if ($this->Limiting != "") $limit = ' AND '.$this->Limiting;
-							$reponse = $this->bdd->prepare ('SELECT '.$fields.' FROM '.$this->Table.' WHERE id REGEXP :ids'.$limit.$this->getOrdering().' LIMIT :nombre OFFSET :debut');
+							$reponse = $this->bdd->prepare ('SELECT '.$fields.' FROM '.$this->Table.' WHERE '.$ID.' REGEXP :ids'.$limit.$this->getOrdering().' LIMIT :nombre OFFSET :debut');
 							$reponse->bindValue('ids', '^('.implode('|', $ids).')$');
 							break;
 					}
@@ -538,7 +554,7 @@ abstract class MysqlTable implements Table
 				}
 				else {
 					// do not limit if getting single id
-					$reponse = $this->bdd->prepare('SELECT '.$fields.' FROM '.$this->Table.' WHERE id = :id'.$this->getOrdering());
+					$reponse = $this->bdd->prepare('SELECT '.$fields.' FROM '.$this->Table.' WHERE '.$ID.' = :id'.$this->getOrdering());
 					$reponse->bindParam('id', $get, PDO::PARAM_INT);
 					$reponse->execute();
 					$donnees = $reponse->fetch();
@@ -598,12 +614,18 @@ abstract class MysqlTable implements Table
 		if (!array_key_exists($_POST['field'], $this->Fields) || $this->Fields[$_POST['field']]->Type != TYPE::FILE)
 			return SQL_ERR::KO;
 		if ($id == GET::_default) $id = $this->idLoad;
+		if (!isset($this->Fields['id'])) {
+			if (!is_object($this->Parent)) return SQL_ERR::KO;
+			$ID = $this->parentItem;
+		}
+		else $ID = 'id';
+		
 		if (!$this->is_data($id)) return FIELD_ERR::UNKNOWN;
 		
 		$path = $this->get_data ($id, $field);
 		$this->Fields[$field]->delete($this->table, $path);
 
-		$reponse = $this->bdd->prepare ('UPDATE '.$this->Table.' SET '.$field.' = "" WHERE id = :id');
+		$reponse = $this->bdd->prepare ('UPDATE '.$this->Table.' SET '.$field.' = "" WHERE '.$ID.' = :id');
 		$reponse->bindParam('id', $id, PDO::PARAM_INT);
 		return ($reponse->execute() ? SQL_ERR::OK : SQL_ERR::UPDATE);
 	}
@@ -812,6 +834,41 @@ abstract class MysqlTable implements Table
 	
 	// Record validated values to DB
 	protected function _record_changes ($validatedValues) {
+		// pas d'id, on travaille sur une entrée existante ou non sur l'id parent
+		if (!isset($this->Fields['id'])) {
+			if (!is_object($this->Parent)) return SQL_ERR::KO;
+			$ID = $this->parentItem;
+			if (is_data($_POST[$ID])) {
+				if (sizeof($this->Fields[$ID]->Errors) == 0) {
+					$ret = false;	// $ret is true if one modif executed
+					$modify = false;
+					foreach ($validatedValues as $field => $value) {
+						if ($field = $ID) contine;
+						// Update
+						if (array_key_exists($field, $this->Fields)) {
+							$modify = true;
+							$ret = ($this->update_field ($validatedValues[$ID], $field, $value) === true ? true : $ret);
+						}
+					}
+					if ($modify) $this->load_id ($validatedValues[$ID]);
+					// Delete
+					else $ret = $this->delete_entry ($validatedValues[$ID]);
+					return $ret;
+				}
+				else return false;
+			}
+			
+			// Insert
+			else {
+				$ret = $this->insert_data ($validatedValues);
+				if (is_numeric ($ret) && $ret > 0) $this->load_id ($ret, ACCESS::WRITE);
+				return $ret;
+			}
+
+			return false;
+		}
+		
+		// Entrée normale avec id
 		// Insert
 		if ($validatedValues['id'] == 0) {
 			$ret = $this->insert_data ($validatedValues);
@@ -874,8 +931,14 @@ abstract class MysqlTable implements Table
 			default: break;
 		}
 				
+		if (!isset($this->Fields['id'])) {
+			if (!is_object($this->Parent)) return SQL_ERR::KO;
+			$ID = $this->parentItem;
+		}
+		else $ID = 'id';
+
 		// Finally delete entry
-		$reponse = $this->bdd->prepare('DELETE FROM '.$this->Table.' WHERE id = :id');
+				$reponse = $this->bdd->prepare('DELETE FROM '.$this->Table.' WHERE '.$ID.' = :id');
 		$reponse->bindParam('id', $id, PDO::PARAM_INT);
 		$ret = ($reponse->execute());
 		$reponse->closeCursor();
@@ -897,8 +960,13 @@ abstract class MysqlTable implements Table
 			return false;
 		}
 		if ($id == GET::__default) $id = $this->idLoad;
+		if (!isset($this->Fields['id'])) {
+			if (!is_object($this->Parent)) return SQL_ERR::KO;
+			$ID = $this->parentItem;
+		}
+		else $ID = 'id';
 		if (!$this->is_data($id)) {
-			array_push ($this->Fields['id']->Errors, FIELD_ERR::UNKNOWN);
+			array_push ($this->Fields[$ID]->Errors, FIELD_ERR::UNKNOWN);
 			return false;
 		}
 		if (sizeof($this->Fields[$field]->Errors) > 0) return false;
@@ -920,7 +988,7 @@ abstract class MysqlTable implements Table
 			$value = $this->update_positions ($field, $id, $value);
 		
 		// Prepare request
-		$reponse = $this->bdd->prepare('UPDATE '.$this->Table.' SET '.$field.' = :value WHERE id = :id');
+				$reponse = $this->bdd->prepare('UPDATE '.$this->Table.' SET '.$field.' = :value WHERE '.$ID.' = :id');
 		switch ($this->Fields[$field]->Type) {
 			case TYPE::ID:
 			case TYPE::PARENT:
@@ -1028,13 +1096,19 @@ abstract class MysqlTable implements Table
 	private function update_positions ($field, $id, $prevId) {
 		$this->load_id($id);
 		$list = $this->get_data(GET::LIST, ['id', 'Position'], ACCESS::WRITE);
+		if (!isset($this->Fields['id'])) {
+			if (!is_object($this->Parent)) return SQL_ERR::KO;
+			$ID = $this->parentItem;
+		}
+		else $ID = 'id';
+;
 		$curPos = 0;
 		// We rewind all entries to 0
 		// If it were edited, increment curPos to keep this difference
 		// lastPos save last recorded position, to see if current entry needs to increment curPos or not
 		$lastPos = $curPos;
 		// Prepare request
-		$reponse = $this->bdd->prepare('UPDATE '.$this->Table.' SET '.$field.' = :value WHERE id = :id');
+				$reponse = $this->bdd->prepare('UPDATE '.$this->Table.' SET '.$field.' = :value WHERE '.$ID.' = :id');
 
 		foreach ($list as $key => $data) {
 			if (!is_numeric($key)) continue;
