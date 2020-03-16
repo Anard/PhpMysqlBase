@@ -142,7 +142,6 @@ abstract class MysqlTable implements Table
 	// Properties
 	protected $Table;				// name of Mysql base table with prefix
 	protected $Parent = NULL;		// Parent de la classe finalle éventuel
-	protected $parentItem; 			// nom de l'id du parent dans la BDD
 	protected $childTables = array(); 	// Enfants de la classe finalle éventuels
 	protected $rights = [	ACCESS::READ => AUTHORISED::__default,
 							ACCESS::WRITE => AUTHORISED::__default
@@ -155,7 +154,9 @@ abstract class MysqlTable implements Table
 	protected $idLoad;				// page loaded Id
 	private	$Ordering;				// default ordering of data
 	private $Limiting;				// default exclusion when getting data
-	private $Prefs = array();	// preference cookies on this table
+	private $Prefs = array();		// preference cookies on this table
+	private $idItem = NULL; 		// nom de l'id dans la BDD
+	private $parentItem; 			// nom de l'id du parent dans la BDD
 
 	// errors
 	private $Errors = [];
@@ -195,18 +196,24 @@ abstract class MysqlTable implements Table
 	function _constructExit ($read_write = ACCESS::__default, $loadGetVar = 'idload') {
 		$this->default_access = ACCESS::getKey($read_write);
 		foreach ($this->Fields as $field => $Field) {
-			if ($Field->Type == TYPE::PARENT) {
-				$this->parentItem = $field;
-				break;
+			switch ($this->Fields[$field]->Type) {
+				case TYPE::ID:
+					$this->idItem = $field;
+					break;
+				case TYPE::PARENT:
+					$this->parentItem = $field;
+					break;
+				default: break;
 			}
 		}
 
-		if (!array_key_exists('id', $this->Fields)) return SQL_ERR::OK;
-		if (is_numeric($this->Fields['id']->Default) && $this->Fields['id']->Default > 0) {
+		if ($this->idItem === NULL && !is_object($this->Parent)) return SQL_ERR::KO;
+		$ID = $this->getIdItem();
+		if (is_numeric($this->Fields[$ID]->Default) && $this->Fields[$ID]->Default > 0) {
 			if ((!isset($_GET[$loadGetVar])) || $_GET[$loadGetVar] == "")
-				return $this->load_id ($this->Fields['id']->Default);
+				return $this->load_id ($this->Fields[$ID]->Default);
 		}
-		if (isset($_GET[$loadGetVar]))
+		if (isset($_GET[$loadGetVar]) && $_GET[$loadGetVar] != "")
 			return $this->load_id ($_GET[$loadGetVar]);
 		else return SQL_ERR::OK;
 	}
@@ -221,8 +228,9 @@ abstract class MysqlTable implements Table
 	public function print_errors () {
 		$data = $this->get_data();
 
+		$ID = $this->getIdItem();
 		foreach ($this->Errors as $error) {
-			if (SQL_ERR::print_error ($error, $this->Fields['id']->Name, $data) !== false) return true;
+			if (SQL_ERR::print_error ($error, $this->Fields[$ID]->Name, $data) !== false) return true;
 		}
 		foreach ($this->Fields as &$Field) {
 			if ($Field->print_errors($data) !== false) { unset ($Field); return true; }
@@ -283,11 +291,7 @@ abstract class MysqlTable implements Table
 		if (!ACCESS::hasKey($read_write)) return false;
 		if (!is_numeric($id)) $id = 0;
 		if (!is_numeric($userid)) $userid = 0;
-		if (!isset($this->Fields['id'])) {
-			if (!is_object($this->Parent)) return SQL_ERR::KO;
-			$ID = $this->parentItem;
-		}
-		else $ID = 'id';
+		$ID = $this->getIdItem();
 		if (!$this->is_data($id)) $id = 0;	// do not block if id doesn't exist
 		if ($id == 0) {
 			if ($this->rights[$read_write] == AUTHORISED::SELF)	return false;
@@ -309,7 +313,7 @@ abstract class MysqlTable implements Table
 		switch ($this->rights[$read_write]) {
 			case AUTHORISED::SELF:
 				if ($id != SessionManagement::getSessId()) return false;
-				$test = $this->bdd->prepare('SELECT id FROM '.$this->Table.' WHERE '.$ID.' = :userid');
+				$test = $this->bdd->prepare('SELECT '.$ID.' FROM '.$this->Table.' WHERE '.$ID.' = :userid');
 				break;
 			case AUTHORISED::MMM:
 			case AUTHORISED::ASSO:
@@ -342,11 +346,7 @@ abstract class MysqlTable implements Table
 	
 	// Search if data exists from DB
 	public function is_data ($id = 0) {
-		if (!isset($this->Fields['id'])) {
-			if (!is_object($this->Parent)) return false;
-			$ID = $this->parentItem;
-		}
-		else $ID = 'id';
+		$ID = $this->getIdItem();
 		$reponse = $this->bdd->prepare('SELECT '.$ID.' FROM '.$this->Table.' WHERE '.$ID.' = :id');
 		$reponse->bindParam('id', $id, PDO::PARAM_INT);
 		$reponse->execute();
@@ -361,13 +361,8 @@ abstract class MysqlTable implements Table
 		if (!ACCESS::hasKey($read_write)) return NULL;
 		if (!GET::hasKey($get) && !is_numeric($get)) $get = GET::__default;
 		if ($get == GET::__default) $get = $this->idLoad;
-		// pas d'id, on travaille sur une entrée existante ou non sur le parent
-		if (!isset($this->Fields['id'])) {
-			if (!is_object($this->Parent)) return NULL;
-			$ID = $this->parentItem;
-		}
-		else $ID = 'id';
-		
+		$ID = $this->getIdItem();
+
 		switch ($get) {
 			case GET::ALL:
 				if (!$this->rights_control($read_write)) return NULL;
@@ -579,11 +574,11 @@ abstract class MysqlTable implements Table
 		if ($this->Parent !== NULL)
 			return ($this->rights_control ($read_write));
 		
-		$request = $this->bdd->query('SELECT id FROM '.$this->Table);
+		$request = $this->bdd->query('SELECT '.$this->idItem.' FROM '.$this->Table);
 		$request->execute();
 		$ret = false;
 		while ($donnees = $request->fetch()) {
-			if ($this->rights_control ($read_write, $donnees['id'])) {
+			if ($this->rights_control ($read_write, $donnees[$this->idItem])) {
 				$ret = true;
 				break;
 			}
@@ -614,14 +609,9 @@ abstract class MysqlTable implements Table
 		if (!array_key_exists($_POST['field'], $this->Fields) || $this->Fields[$_POST['field']]->Type != TYPE::FILE)
 			return SQL_ERR::KO;
 		if ($id == GET::_default) $id = $this->idLoad;
-		if (!isset($this->Fields['id'])) {
-			if (!is_object($this->Parent)) return SQL_ERR::KO;
-			$ID = $this->parentItem;
-		}
-		else $ID = 'id';
-		
 		if (!$this->is_data($id)) return FIELD_ERR::UNKNOWN;
-		
+		$ID = $this->getIdItem();
+
 		$path = $this->get_data ($id, $field);
 		$this->Fields[$field]->delete($this->table, $path);
 
@@ -637,14 +627,14 @@ abstract class MysqlTable implements Table
 		
 		$ret = SQL_ERR::OK;
 		$item = AUTHORISED::_ITEM[$this->Parent->rights[ACCESS::WRITE]];
-		$reponse = $this->bdd->prepare ('SELECT id FROM '.$this->Table.' WHERE '.$item.' = :id_parent');
+		$reponse = $this->bdd->prepare ('SELECT '.$this->idItem.' FROM '.$this->Table.' WHERE '.$item.' = :id_parent');
 		$reponse->bindParam('id_parent', $parentId, PDO::PARAM_INT);
 		$ret = $reponse->execute();
 		if (!$ret) return $ret;
 		$entries = $reponse->fetchAll();
 		$reponse->closeCursor();
 		foreach ($entries as $entry) {
-			$ret = $this->delete_entry ($entry['id']);
+			$ret = $this->delete_entry ($entry[$this->idItem]);
 			if (!$ret) break;
 		}
 		return $ret;
@@ -662,13 +652,14 @@ abstract class MysqlTable implements Table
 	// Recherche d'une autre entrée avec la même valeur sur un champ
 	protected function isUnique ($field, $value) {
 		if (!array_key_exists($field, $this->Fields)) return true;
-		
+		$ID = $this->getIdItem();
+
 		// exclude posted value
-		if (isset($_POST['id']) && $this->is_data($_POST['id']))
-			$exclude = $this->get_data ($_POST['id'], $field);
+		if (isset($_POST[$ID]) && $this->is_data($_POST[$ID]))
+			$exclude = $this->get_data ($_POST[$ID], $field);
 			
 		// search value
-		$reponse = $this->bdd->prepare('SELECT id, '.$field.' FROM '.$this->Table.' WHERE '.$field.' = :value');
+		$reponse = $this->bdd->prepare('SELECT '.$ID.', '.$field.' FROM '.$this->Table.' WHERE '.$field.' = :value');
 		switch ($this->Fields[$field]->Type) {
 			case TYPE::ID:
 			case TYPE::PARENT:
@@ -810,8 +801,8 @@ abstract class MysqlTable implements Table
 			switch ($this->Fields[$field]->Type) {
 				case TYPE::ID: break;
 				case TYPE::PARENT:
-					$default = $this->Parent->getDefaults('id');
-					$name = $this->Parent->Fields['id']->Name;
+					$default = $this->Parent->getDefaults($this->Parent->idItem);
+					$name = $this->Parent->Fields[$this->Parent->idItem]->Name;
 					break;
 				case TYPE::COLOR:
 					DataManagement::randomColor(); break;
@@ -834,16 +825,15 @@ abstract class MysqlTable implements Table
 	
 	// Record validated values to DB
 	protected function _record_changes ($validatedValues) {
+		$ID = $this->getIdItem();
 		// pas d'id, on travaille sur une entrée existante ou non sur l'id parent
-		if (!isset($this->Fields['id'])) {
-			if (!is_object($this->Parent)) return SQL_ERR::KO;
-			$ID = $this->parentItem;
+		if ($this->idItem === NULL) {
 			if ($this->is_data($_POST[$ID])) {
 				if (sizeof($this->Fields[$ID]->Errors) == 0) {
 					$ret = false;	// $ret is true if one modif executed
 					$modify = false;
 					foreach ($validatedValues as $field => $value) {
-						if ($field = $ID) continue;
+						if ($field == $ID) continue;
 						if ($value == 0 || $value == "") continue;
 						// Update
 						if (array_key_exists($field, $this->Fields)) {
@@ -871,18 +861,18 @@ abstract class MysqlTable implements Table
 		
 		// Entrée normale avec id
 		// Insert
-		if ($validatedValues['id'] == 0) {
+		if ($validatedValues[$ID] == 0) {
 			$ret = $this->insert_data ($validatedValues);
 			if (is_numeric ($ret) && $ret > 0) $this->load_id ($ret, ACCESS::WRITE);
 			return $ret;
 		}
 
 		// Update
-		elseif (sizeof($this->Fields['id']->Errors) == 0) {
+		elseif (sizeof($this->Fields[$ID]->Errors) == 0) {
 			$ret = false;	// $ret is true if one modif executed
 			foreach ($validatedValues as $field => $value)
-				$ret = ($this->update_field ($validatedValues['id'], $field, $value) === true ? true : $ret);
-			$this->load_id ($validatedValues['id']);
+				$ret = ($this->update_field ($validatedValues[$ID], $field, $value) === true ? true : $ret);
+			$this->load_id ($validatedValues[$ID]);
 			return $ret;
 		}
 				
@@ -932,14 +922,9 @@ abstract class MysqlTable implements Table
 			default: break;
 		}
 				
-		if (!isset($this->Fields['id'])) {
-			if (!is_object($this->Parent)) return SQL_ERR::KO;
-			$ID = $this->parentItem;
-		}
-		else $ID = 'id';
-
+		$ID = $this->getIdItem();
 		// Finally delete entry
-				$reponse = $this->bdd->prepare('DELETE FROM '.$this->Table.' WHERE '.$ID.' = :id');
+		$reponse = $this->bdd->prepare('DELETE FROM '.$this->Table.' WHERE '.$ID.' = :id');
 		$reponse->bindParam('id', $id, PDO::PARAM_INT);
 		$ret = $reponse->execute();
 		$reponse->closeCursor();
@@ -961,11 +946,6 @@ abstract class MysqlTable implements Table
 			return false;
 		}
 		if ($id == GET::__default) $id = $this->idLoad;
-		if (!isset($this->Fields['id'])) {
-			if (!is_object($this->Parent)) return SQL_ERR::KO;
-			$ID = $this->parentItem;
-		}
-		else $ID = 'id';
 		if (!$this->is_data($id)) {
 			array_push ($this->Fields[$ID]->Errors, FIELD_ERR::UNKNOWN);
 			return false;
@@ -976,7 +956,8 @@ abstract class MysqlTable implements Table
 			if ($value == $curValue) return false;
 		}
 		if ($type == TYPE::PASSWD && $value == "") return false;
-		
+		$ID = $this->getIdItem();
+
 		// Upload file
 		if ($type == TYPE::FILE) {
 			$value = $this->Fields[$field]->upload($this->table, $field);
@@ -1009,14 +990,17 @@ abstract class MysqlTable implements Table
 	}
 
 	// PRIVATE
+	private function getIdItem() {
+		return ($this->idItem === NULL ? $ID = $this->parentItem : $this->idItem);
+	}
+	
 	// Insert full entry in DB, return false or ID of created entry
 	private function insert_data ($validatedValues) {
 		if (!$this->rights_control(ACCESS::WRITE, 0, SessionManagement::getSessId())) {
 			array_push ($this->Errors, SQL_ERR::ACCESS);
 			return false;
 		}
-		if (!isset($this->Fields['id'])) $ID = $this->parentItem;
-		else $ID = 'id';
+		$ID = $this->getIdItem();
 		if (sizeof($this->Fields[$ID]->Errors) > 0)
 			return false;
 
@@ -1084,7 +1068,7 @@ abstract class MysqlTable implements Table
 				$item = AUTHORISED::_ITEM[$this->rights[ACCESS::WRITE]];
 				$userid = SessionManagement::getSessId();
 				$reponse = $this->bdd->prepare('INSERT INTO '.$Table.' ('.$item.', id_user) VALUES (:itemid, :userid)');
-				$reponse->bindParam('itemid', $donnees['id'], PDO::PARAM_INT);
+				$reponse->bindParam('itemid', $donnees[$ID], PDO::PARAM_INT);
 				$reponse->bindParam('userid', $userid, PDO::PARAM_INT);
 				$ret = ($reponse->execute());
 				$reponse->closeCursor();
@@ -1098,20 +1082,16 @@ abstract class MysqlTable implements Table
 	// Update positions of all entries, $is = entry's id, $prevId = id of new previous entry, Return new value of TYPE::POSITION's field
 	private function update_positions ($field, $id, $prevId) {
 		$this->load_id($id);
-		$list = $this->get_data(GET::LIST, ['id', 'Position'], ACCESS::WRITE);
-		if (!isset($this->Fields['id'])) {
-			if (!is_object($this->Parent)) return SQL_ERR::KO;
-			$ID = $this->parentItem;
-		}
-		else $ID = 'id';
-;
+		$ID = $this->getIdItem();
+		$list = $this->get_data(GET::LIST, [$ID, 'Position'], ACCESS::WRITE);
+
 		$curPos = 0;
 		// We rewind all entries to 0
 		// If it were edited, increment curPos to keep this difference
 		// lastPos save last recorded position, to see if current entry needs to increment curPos or not
 		$lastPos = $curPos;
 		// Prepare request
-				$reponse = $this->bdd->prepare('UPDATE '.$this->Table.' SET '.$field.' = :value WHERE '.$ID.' = :id');
+		$reponse = $this->bdd->prepare('UPDATE '.$this->Table.' SET '.$field.' = :value WHERE '.$ID.' = :id');
 
 		foreach ($list as $key => $data) {
 			if (!is_numeric($key)) continue;
@@ -1120,18 +1100,18 @@ abstract class MysqlTable implements Table
 				$lastPos = $data['Position'];
 			}
 			// Current : skip, it'll be done last
-			if ($data['id'] == $id) continue;
+			if ($data[$ID] == $id) continue;
 
 			// Update position
 			if ($data['Position'] != $curPos) {
-				$reponse->bindParam('id', $data['id'], PDO::PARAM_INT);
+				$reponse->bindParam('id', $data[$ID], PDO::PARAM_INT);
 				$reponse->bindParam('value', $curPos, PDO::PARAM_INT);
 				$reponse->execute();
 			}
 			
 			// Previous found, set current entry's value
-			if ($data['id'] == $prevId) {
-				if ($data['id'] < $id)
+			if ($data[$ID] == $prevId) {
+				if ($data[$ID] < $id)
 					$curPos++;
 				$thisPos = $curPos;
 				$curPos++;
@@ -1173,7 +1153,7 @@ abstract class MysqlTable implements Table
 
 		if ($this->Parent === NULL || !is_numeric($this->idLoad) || $this->idLoad == 0) return SQL_ERR::OK;
 		// Load parent
-	return $this->Parent->load_id($this->get_data($this->idLoad, $this->parentItem, $read_write), $read_write);
+		return $this->Parent->load_id($this->get_data($this->idLoad, $this->parentItem, $read_write), $read_write);
 	}
 }
 
