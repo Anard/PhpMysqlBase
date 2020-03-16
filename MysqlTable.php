@@ -844,6 +844,7 @@ abstract class MysqlTable implements Table
 					$modify = false;
 					foreach ($validatedValues as $field => $value) {
 						if ($field = $ID) continue;
+						if ($value == 0 || $value == "") continue;
 						// Update
 						if (array_key_exists($field, $this->Fields)) {
 							$modify = true;
@@ -940,7 +941,7 @@ abstract class MysqlTable implements Table
 		// Finally delete entry
 				$reponse = $this->bdd->prepare('DELETE FROM '.$this->Table.' WHERE '.$ID.' = :id');
 		$reponse->bindParam('id', $id, PDO::PARAM_INT);
-		$ret = ($reponse->execute());
+		$ret = $reponse->execute();
 		$reponse->closeCursor();
 		
 		if (!$ret) {
