@@ -991,7 +991,7 @@ abstract class MysqlTable implements Table
 
 	// PRIVATE
 	private function getIdItem() {
-		return ($this->idItem === NULL ? $ID = $this->parentItem : $this->idItem);
+		return ($this->idItem === NULL ? $this->parentItem : $this->idItem);
 	}
 	
 	// Insert full entry in DB, return false or ID of created entry
