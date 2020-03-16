@@ -27,7 +27,7 @@ interface UI_"Class" extends UI_Table {
 }
 
 // ---------- FINAL CLASS ------------
-final class "Class"Table extends MysqlTable implements "Class"
+final class "Class"Table extends MysqlTable implements "Class", UI_"Class"
 {
 	// Constants
 	// Properties
@@ -81,20 +81,21 @@ final class "Class"Table extends MysqlTable implements "Class"
 	// ----------- Specific Methods ------------
 	// GETTERS
 	// SETTERS
-}
 
+	
 // ---------- FINAL UI CLASS ------------
-final class UI_"Class"Table extends UI_MysqlTable implements UI_"Class"
-{
-	// Constants
-	const CHOIX_LISTE = [10, 15, 20, 30];	// choix nb entrées par liste
+	// Properties
+	public static $choixListe = [10, 15, 20, 30];	// choix nb entrées par liste si modifié
 
 	// --------- Override or Initialize UI methods ---------	
 	// Draw specific form's fieldset
-	public static function draw_fieldset($action, $data, $table) {
+	public function draw_fieldset($action = NULL, $data = NULL) {
+		if (is_null($action))
+			$action = ($this->idLoad > 0 ? "CLASS"_ACTION::ADD : "CLASS"_ACTION::EDIT);
+		if (is_null($data)) $data = $this->get_data();
 		if (!"CLASS"_ACTION::hasValue($action)) return false;
 		if ($action == "CLASS"_ACTION::DELETE)
-			return self::_draw_delete_form ($action, $data, $table, ERR::replaceFields("CLASS"_ACTION::LEGEND["CLASS"_ACTION::DELETE], $data));
+			return $this->draw_delete_form ($data);
 		
 		// FORMULAIRE
 		echo '<form action="PAGE.PHP" method="post">';
@@ -104,17 +105,32 @@ final class UI_"Class"Table extends UI_MysqlTable implements UI_"Class"
 				echo '</legend>';
 			
 				echo '<input type="hidden" name="action" value="'.$action.'" required />';
-				echo '<input type="hidden" name="id" id="id" value="'.$data['id'].'" required /></fieldset>';
-				echo '<input type="reset" value="Revenir" onclick="loadContent(0, \''.$table.'\');" /><input type="submit" value="Valider" />';
+		echo '<input type="hidden" name="'.$this->getIdItem().'" id="id" value="'.$data[$this->getIdItem()].'" required /></fieldset>';
+				echo '<input type="reset" value="Revenir" onclick="loadContent(0, \''.$this->table.'\');" /><input type="submit" value="Valider" />';
 		echo '</form>';
+		return true;
 	}
 	
-	// Admin list
 	// Draw list
-	public static function draw_list ($list, $deploy = true, $read_write = ACCESS::__default) {
-		self::_draw_list_header ($list['listData'], sizeof($list)-1, $deploy);
-		self::_draw_list_block ("CLASS"_ACTION::DELETE, $list, $read_write);
-		self::_draw_list_nav ($list['listData'], sizeof($list)-1, $deploy);
+	public function draw_list ($list = NULL, $deploy = true, $read_write = NULL, $table = NULL) {
+		if (is_null($read_write)) $read_write = $this->default_access;
+		if (!ACCESS::hasKey($read_write)) return false;
+		if (is_null($list))
+			$list = $this->get_data(GET::LIST);
+		if (!$list) return false;
+
+		$this->_draw_list_header ($list['listData'], sizeof($list)-1, $deploy);
+		$this->_draw_list_block ("CLASS"_ACTION::DELETE, $list, $read_write, $table);
+		$this->_draw_list_nav ($list['listData'], sizeof($list)-1, $deploy);
+		return true;
+	}
+	
+	// PRIVATE
+	// Draw specific delete form
+	private function draw_delete_form ($data = NULL) {
+		if (is_null($data)) $data = $this->get_data();
+		if (!$data) return false;
+		return $this->_draw_delete_form ("CLASS"_ACTION::DELETE, $data, ERR::replaceFields("CLASS"_ACTION::LEGEND["CLASS"_ACTION::DELETE], $data));
 	}
 	
 	// ----------- Specific Methods ------------

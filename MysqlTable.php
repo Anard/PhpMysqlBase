@@ -10,6 +10,10 @@ interface Table {
 	// PUBLIC
 	// GETTERS
 	public function print_errors();
+	// Get id or parentid 's field
+	public function getIdItem();
+	// Get parentid 's field
+	public function getParentItem();
 	// Get table short name
 	public function getTableName();
 	// Get defaults
@@ -18,6 +22,7 @@ interface Table {
 	public function getIdLoad();
 	// Return true if default access is write access
 	public function isAdminSection();
+	
 	// Check if authorized
 	public function rights_control ($read_write = NULL, $id = 0, $userid = 0);
 	// Search if data exists from DB
@@ -25,11 +30,12 @@ interface Table {
 	// Return data array from DB, $read_write n'est utilisé que pour GET::LIST pour obtenir la list des entréees autorisées
 	public function get_data ($get = GET::__default, $fields = GET::ALL, $read_write = NULL);
 	
-	// Admin list
+	// List
 	// Check if authorised on multiple entries
 	public function need_list ($read_write = NULL);
 	
 	// SETTERS
+	// Get posted values and record
 	public function send_form (); // values are from form's POST variables
 	// Delete single file
 	public function deleteFile ($field, $id);
@@ -39,11 +45,17 @@ interface Table {
 
 // UI for Table CLASS
 interface UI_Table {
+	// Constants
+	const DefaultListLength = 10;	// longueur des listes
+
 	// Draw specific form's fieldset (innerHTML, could be a div or anything else)
-	public static function draw_fieldset ($action, $data, $table);
+	public function draw_fieldset ($action = NULL, $data = NULL);
 	
-	// Draw admin list
-	public static function draw_list ($list, $deploy = true, $read_write = ACCESS::__default);
+	// Draw list
+	public function draw_list ($list = NULL, $deploy = true, $read_write = NULL, $table = NULL);
+
+	// Draw specific delete form
+	//private function draw_delete_form ($data = NULL);
 }
 
 // ERRORS
@@ -134,7 +146,7 @@ class GET extends ExtdEnum {
 }
 
 // ---------- GLOBAL BASE CLASS ------------
-abstract class MysqlTable implements Table
+abstract class MysqlTable implements Table, UI_Table
 {
 	// Constants
 	const DEFAULT_ACCESS = NULL;
@@ -151,7 +163,7 @@ abstract class MysqlTable implements Table
 	protected $default_access;		// default ACCESS value
 	// readable au niveau supérieur (getter)
 	protected $table;				// name of Mysql base table
-	protected $idLoad;				// page loaded Id
+	protected $idLoad = NULL;		// page loaded Id
 	private	$Ordering;				// default ordering of data
 	private $Limiting;				// default exclusion when getting data
 	private $Prefs = array();		// preference cookies on this table
@@ -238,6 +250,14 @@ abstract class MysqlTable implements Table
 		unset ($Field); return false;
 	}
 	
+	// Get id or parentid 's field
+	public function getIdItem() {
+		return ($this->idItem === NULL ? $this->parentItem : $this->idItem);
+	}
+	// Get parentid 's field
+	public function getParentItem() {
+		return $this->parentItem;
+	}
 	// Get table short name
 	public function getTableName() {
 		return $this->table;
@@ -260,7 +280,7 @@ abstract class MysqlTable implements Table
 			return $ret;
 		}
 		elseif (array_key_exists ($fields, $this->Fields))
-			return $this->Fields[$field]->Default;
+			return $this->Fields[$fields]->Default;
 		else return NULL;
 	}
 
@@ -400,7 +420,8 @@ abstract class MysqlTable implements Table
 				if ($this->Parent !== NULL) {
 					if ($this->Limiting != "") $limit = ' AND '.$this->Limiting;
 					$reponse = $this->bdd->prepare('SELECT '.$fields.' FROM '.$this->Table.' WHERE '.$this->parentItem.' = :parent'.$limit.$this->getOrdering());
-					$reponse->bindParam('parent', $this->Parent->idLoad, PDO::PARAM_INT);
+					$parentId = $this->Parent->getIdLoad();
+					$reponse->bindParam('parent', $parentId, PDO::PARAM_INT);
 					$reponse->execute();
 					$donnees = $reponse->fetchAll();
 					$reponse->closeCursor();
@@ -412,10 +433,6 @@ abstract class MysqlTable implements Table
 						// append additionnal informations
 						$nombre = sizeof($donnees);
 						$donnees['listData'] = array(
-							'table' => $this->table,
-							'parentTable' => $this->Parent->table,
-							'currentId' => $this->getIdLoad(),
-							'parentId' => $this->Parent->getIdLoad(),
 							'nombre' => $nombre,
 						);
 					}
@@ -479,7 +496,7 @@ abstract class MysqlTable implements Table
 				
 				// Réduction éventuelle de la page
 				$first = 0;
-				$nombre = UI_MysqlTable::DefaultListLength;
+				$nombre = self::DefaultListLength;
 				if (isset($_GET['deb']) && is_numeric ($_GET['deb'])) { $first=intval($_GET['deb']); }
 				if (isset($_GET['nbr']) && is_numeric ($_GET['nbr'])) { $nombre=intval($_GET['nbr']); }
 				if ($first < 0) { $first = 0; }
@@ -499,10 +516,6 @@ abstract class MysqlTable implements Table
 				if ($donnees) {
 					// append additionnal informations
 					$donnees['listData'] = array(
-						'table' => $this->table,
-						'listName' => $this->Fields['id']->Name,
-						'defaultId' => $this->Fields['id']->Default,
-						'currentId' => $this->getIdLoad(),
 						'first' => $first,
 						'nombre' => $nombre,
 						'prec' => $prec,
@@ -544,7 +557,7 @@ abstract class MysqlTable implements Table
 					// if get isn't null and Parent exists, set parent id if known
 					if ($this->Parent !== NULL) {
 						if (array_key_exists($this->parentItem, $donnees))
-							$donnees[$this->parentItem] = $this->Parent->getidLoad();
+							$donnees[$this->parentItem] = $this->Parent->getIdLoad();
 					}
 				}
 				else {
@@ -990,10 +1003,6 @@ abstract class MysqlTable implements Table
 	}
 
 	// PRIVATE
-	private function getIdItem() {
-		return ($this->idItem === NULL ? $this->parentItem : $this->idItem);
-	}
-	
 	// Insert full entry in DB, return false or ID of created entry
 	private function insert_data ($validatedValues) {
 		if (!$this->rights_control(ACCESS::WRITE, 0, SessionManagement::getSessId())) {
@@ -1155,23 +1164,15 @@ abstract class MysqlTable implements Table
 		// Load parent
 		return $this->Parent->load_id($this->get_data($this->idLoad, $this->parentItem, $read_write), $read_write);
 	}
-}
 
-// ---------- GLOBAL BASE UI CLASS ------------
-abstract class UI_MysqlTable implements UI_Table
-{
-	// Constants
-	const DefaultListLength = 10;	// longueur des listes admin
 	
+// ---------- GLOBAL BASE UI CLASS ------------
 	// Properties
 	public static $choixListe = [10, 15, 20, 30];	// choix nb entrées par liste
 
-	// prevent instanciation
-    function __construct() { }
-	
-	// SPECIFICS
+	// UI Methods
 	// Draw Delete form
-	protected static function _draw_delete_form ($action, $data, $table, $texte) {
+	protected function _draw_delete_form ($action, $data, $texte = "") {
 		do {
 			if (next ($data) === false) break;
 		} while (is_numeric (key($data)) || is_numeric(current($data)));
@@ -1179,7 +1180,7 @@ abstract class UI_MysqlTable implements UI_Table
 		reset ($data);
 		
 		//$scriptsuppr = 'confirmsuppr('.$data['id'].', "'.$table.'", "'.$data[$mainField].'");';
-		$scriptsuppr = 'confirmsuppr('.$data['id'].', "'.$table.'", "'.$texte.'");';
+		$scriptsuppr = 'confirmsuppr('.$data[$this->idItem].', "'.$this->table.'", "'.$texte.'");';
 		
 		?>
 		<form class="imgButton" method="post" action="<?php echo $_SERVER['SCRIPT_NAME']; ?>" id="suppr<?php echo $table.$data['id']; ?>">
@@ -1190,8 +1191,8 @@ abstract class UI_MysqlTable implements UI_Table
 		<?php 	}
 
 	// Admin List
-	protected static function _draw_list_header ($listData, $listSize, $deploy = true) {
-		$listName = $listData['listName'];
+	protected function _draw_list_header ($listData, $listSize, $deploy = true) {
+		$listName = $this->Fields[$this->idItem]->Name;
 		if (substr ($listName, -1) != 's') $listName .= 's';
 		
 		// deploy link
@@ -1215,7 +1216,10 @@ abstract class UI_MysqlTable implements UI_Table
 			echo '</h3>';
 	}
 	
-	protected static function _draw_list_block ($supprAction, $list, $read_write = ACCESS::__default) {
+	protected function _draw_list_block ($supprAction, $list, $read_write = NULL, $table = NULL) {
+		if (is_null($read_write)) $read_write = $this->default_access;
+		if (!ACCESS::hasKey($read_write)) return false;
+		if (is_null($table)) $table = $this->table;
 		foreach ($list as $donnees) {
 			if ($donnees == $list['listData']) continue;
 			do {
@@ -1225,14 +1229,12 @@ abstract class UI_MysqlTable implements UI_Table
 			reset ($donnees);
 			break;
 		}
-		$table = $list['listData']['table'];
-		$idLoad = $list['listData']['currentId'];
 		
 		?><ul><?php
 		foreach ($list as $donnees) {
 			if ($donnees == $list['listData']) continue;
-			echo '<li id="entry'.$donnees['id'].'"';
-			if ($idLoad == $donnees['id'])
+			echo '<li id="entry'.$donnees[$this->idItem].'"';
+			if ($idLoad == $donnees[$this->idItem])
 				echo ' class="currentEntry"';
 			echo '>';
 			if (substr($_SERVER['SCRIPT_NAME'], -5, 1) == 's')
@@ -1241,16 +1243,16 @@ abstract class UI_MysqlTable implements UI_Table
 			$dest .= $donnees['id']; 
 
 			if ($read_write == ACCESS::WRITE)
-				self::_draw_delete_form($supprAction, $donnees, $table);
+				$this->draw_delete_form($donnees);
 			
-			echo '<a onclick="loadContent('.$donnees['id'].', \''.$table.'\'); return false;" ';
+			echo '<a onclick="loadContent('.$donnees[$this->idItem].', \''.$table.'\'); return false;" ';
 			echo 'href="'.$dest.'">'.$donnees[$mainField].'</a>';
 			echo '</li>';					
 		} ?></ul><?php
 		return SQL_ERR::OK;
 	}
 	
-	protected static function _draw_list_nav ($listData, $listSize, $deploy = true) {
+	protected function _draw_list_nav ($listData, $listSize, $deploy = true) {
 		// Navigation
 		echo '<div class="navEntries">';
 			// Base pour l'url dure
@@ -1261,7 +1263,6 @@ abstract class UI_MysqlTable implements UI_Table
 				$urlbase = substr($_SERVER['REQUEST_URI'],0,strripos($_SERVER['REQUEST_URI'],'.'));	
 			}
 			else $urlbase = $_SERVER['REQUEST_URI'];
-				
 				
 			// Base pour l'url JavaScript
 			switch ($_SERVER['SCRIPT_NAME']) {
