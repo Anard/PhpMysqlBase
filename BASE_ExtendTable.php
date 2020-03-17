@@ -74,6 +74,7 @@ final class "Class"Table extends MysqlTable implements "Class", UI_"Class"
 			
 			else return $this->_send_form ();
 		}
+		// if parent is sent in same form
 		elseif ($this->Parent !== NULL) return $this->Parent->send_form();
 		else return false;
 	}
@@ -89,13 +90,15 @@ final class "Class"Table extends MysqlTable implements "Class", UI_"Class"
 
 	// --------- Override or Initialize UI methods ---------	
 	// Draw specific form's fieldset
-	public function draw_fieldset($action = NULL, $data = NULL) {
+	public function draw_fieldset($action = NULL, $id = NULL) {
 		if (is_null($action))
-			$action = ($this->idLoad > 0 ? "CLASS"_ACTION::ADD : "CLASS"_ACTION::EDIT);
-		if (is_null($data)) $data = $this->get_data();
+			$action = ($id ? "CLASS"_ACTION::ADD : "CLASS"_ACTION::EDIT);
 		if (!"CLASS"_ACTION::hasValue($action)) return false;
 		if ($action == "CLASS"_ACTION::DELETE)
 			return $this->draw_delete_form ($data);
+		if (is_null($id)) $data = $this->get_data(GET::SELF, ACCESS::WRITE);
+		else $data = $this->get_data($id, ACCESS::WRITE);
+		if (!$data) return false;
 		
 		// FORMULAIRE
 		echo '<form action="PAGE.PHP" method="post">';
@@ -116,7 +119,7 @@ final class "Class"Table extends MysqlTable implements "Class", UI_"Class"
 		if (is_null($read_write)) $read_write = $this->default_access;
 		if (!ACCESS::hasKey($read_write)) return false;
 		if (is_null($list))
-			$list = $this->get_data(GET::LIST);
+			$list = $this->get_data(GET::LIST, $read_write);
 		if (!$list) return false;
 
 		$this->_draw_list_header ($list['listData'], sizeof($list)-1, $deploy);
@@ -127,8 +130,9 @@ final class "Class"Table extends MysqlTable implements "Class", UI_"Class"
 	
 	// PRIVATE
 	// Draw specific delete form
-	private function draw_delete_form ($data = NULL) {
-		if (is_null($data)) $data = $this->get_data();
+	private function draw_delete_form ($id = NULL) {
+		if (is_null($id)) $data = $this->get_data(GET::SELF, ACCESS::WRITE);
+		else $data = $this->get_data($id, ACCESS::WRITE);
 		if (!$data) return false;
 		return $this->_draw_delete_form ("CLASS"_ACTION::DELETE, $data, ERR::replaceFields("CLASS"_ACTION::LEGEND["CLASS"_ACTION::DELETE], $data));
 	}

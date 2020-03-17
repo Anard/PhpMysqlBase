@@ -221,6 +221,7 @@ abstract class MysqlTable implements Table, UI_Table
 
 		if ($this->idItem === NULL && !is_object($this->Parent)) return SQL_ERR::KO;
 		$ID = $this->getIdItem();
+
 		if (is_numeric($this->Fields[$ID]->Default) && $this->Fields[$ID]->Default > 0) {
 			if ((!isset($_GET[$loadGetVar])) || $_GET[$loadGetVar] == "")
 				return $this->load_id ($this->Fields[$ID]->Default);
