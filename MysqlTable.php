@@ -5,7 +5,7 @@ require_once ('FileField.php');
 // ----------- GLOBAL Mysql Table INTERFACE to implement in child classes ------------
 interface Table {
 	// Set defaults and table
-	function __construct($read_write = ACCESS::__default);
+	function __construct($read_write = ACCESS::__default, &$bdd = NULL);
 
 	// PUBLIC
 	// GETTERS
@@ -174,14 +174,16 @@ abstract class MysqlTable implements Table, UI_Table
 	private $Errors = [];
 
 	// Constructor => inherit : lien vers la table héritée)
-	function _constructInit ($table, $childTables = [], $ordering = "", $limiting = "") {
-		if ($this->Parent == NULL) {
-			$connecting = 'insideClass';
-			include ('../Config/connexion.php');
+	function _constructInit ($table, $childTables = [], $ordering = "", $limiting = "", &$bdd = NULL) {
+		// DB Connection
+		if (!is_null($bdd) || !is_null($this->Parent)) {
+			if (!is_null($bdd)) $this->bdd = $bdd;
+			else $this->bdd = $this->Parent->bdd;
+			include ('../Config/config.php');
 		}
 		else {
-			$this->bdd = $this->Parent->bdd;
-			include ('../Config/config.php');
+			$connecting = 'insideClass';
+			include ('../Config/connexion.php');
 		}
 		
 		// Init consts

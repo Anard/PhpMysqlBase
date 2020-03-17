@@ -34,13 +34,14 @@ final class "Class"Table extends MysqlTable implements "Class", UI_"Class"
 	public "Parent"
 
 	// Constructor
-	function __construct ($read_write = ACCESS::__default) {
+	function __construct ($read_write = ACCESS::__default, &$bdd = NULL) {
 		// Define Parent first
-		$this->Parent = new "ParentTable" ($read_write);
+		$this->Parent = new "ParentTable" ($read_write, $bdd);
 		if (!$this->Parent) return false;
 		$this->"Parent" = &$this->Parent;
 		
-		if (parent::_constructInit('TABLE', ['ChildTable'], 'ORDERING', 'LIMITING') !== true)
+		// Children are defined to be deleted on deletion of an entry
+		if (parent::_constructInit('TABLE', ['ChildTable'], 'ORDERING', 'LIMITING') !== true, $bdd)
 			return false;
 		
 		// Init rights
@@ -70,7 +71,7 @@ final class "Class"Table extends MysqlTable implements "Class", UI_"Class"
 		
 		if ("CLASS"_ACTION::hasValue($_POST['action'])) {
 			if ($_POST['action'] == "CLASS"_ACTION::DELETE)
-				return $this->delete_entry ($_POST['id']);
+				return $this->delete_entry ($_POST[$this->getIdItem()]);
 			
 			else return $this->_send_form ();
 		}
@@ -96,8 +97,8 @@ final class "Class"Table extends MysqlTable implements "Class", UI_"Class"
 		if (!"CLASS"_ACTION::hasValue($action)) return false;
 		if ($action == "CLASS"_ACTION::DELETE)
 			return $this->draw_delete_form ($data);
-		if (is_null($id)) $data = $this->get_data(GET::SELF, ACCESS::WRITE);
-		else $data = $this->get_data($id, ACCESS::WRITE);
+		if (is_null($id)) $data = $this->get_data(GET::SELF, GET::ALL, ACCESS::WRITE);
+		else $data = $this->get_data($id, GET::ALL, ACCESS::WRITE);
 		if (!$data) return false;
 		
 		// FORMULAIRE
@@ -131,8 +132,8 @@ final class "Class"Table extends MysqlTable implements "Class", UI_"Class"
 	// PRIVATE
 	// Draw specific delete form
 	private function draw_delete_form ($id = NULL) {
-		if (is_null($id)) $data = $this->get_data(GET::SELF, ACCESS::WRITE);
-		else $data = $this->get_data($id, ACCESS::WRITE);
+		if (is_null($id)) $data = $this->get_data(GET::SELF, GET::ALL, ACCESS::WRITE);
+		else $data = $this->get_data($id, GET::ALL, ACCESS::WRITE);
 		if (!$data) return false;
 		return $this->_draw_delete_form ("CLASS"_ACTION::DELETE, $data, ERR::replaceFields("CLASS"_ACTION::LEGEND["CLASS"_ACTION::DELETE], $data));
 	}
