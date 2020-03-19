@@ -41,7 +41,7 @@ final class "Class"Table extends MysqlTable implements "Class", UI_"Class"
 		$this->"Parent" = &$this->Parent;
 		
 		// Children are defined to be deleted on deletion of an entry
-		if (parent::_constructInit('TABLE', ['ChildTable'], 'ORDERING', 'LIMITING') !== true, $bdd)
+		if (parent::_constructInit('TABLE', ['ChildTable'], 'ORDERING', 'LIMITING', $bdd) !== true)
 			return false;
 		
 		// Init rights
@@ -92,14 +92,14 @@ final class "Class"Table extends MysqlTable implements "Class", UI_"Class"
 	// --------- Override or Initialize UI methods ---------	
 	// Draw specific form's fieldset
 	public function draw_fieldset($action = NULL, $id = NULL) {
-		if (is_null($action))
-			$action = ($id ? "CLASS"_ACTION::ADD : "CLASS"_ACTION::EDIT);
-		if (!"CLASS"_ACTION::hasValue($action)) return false;
 		if ($action == "CLASS"_ACTION::DELETE)
-			return $this->draw_delete_form ($data);
+			return $this->draw_delete_form ($id);
 		if (is_null($id)) $data = $this->get_data(GET::SELF, GET::ALL, ACCESS::WRITE);
 		else $data = $this->get_data($id, GET::ALL, ACCESS::WRITE);
 		if (!$data) return false;
+		if (is_null($action))
+			$action = ($data[$this->getIdItem()] ? "CLASS"_ACTION::EDIT : "CLASS"_ACTION::ADD);
+		if (!"CLASS"_ACTION::hasValue($action)) return false;
 		
 		// FORMULAIRE
 		echo '<form action="PAGE.PHP" method="post">';

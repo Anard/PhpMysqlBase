@@ -201,6 +201,7 @@ class Field implements FieldInterface
 				return intval($data);
 
 			case TYPE::DATE:
+				if (is_object($data)) return $data;
 				if (preg_match ('#^[0-9]+$#', $data) == 1)
 					return new DateTime (strtotime($data));
 				else return DateTime::createFromFormat ('Y-m-d', $data);
