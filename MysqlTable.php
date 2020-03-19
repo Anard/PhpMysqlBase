@@ -235,6 +235,7 @@ abstract class MysqlTable implements Table, UI_Table
 
 	// Destructor
 	function __destruct () {
+		if (!is_null($this->Parent) $this->Parent = NULL;
 		$this->bdd = NULL;
 	}
 	

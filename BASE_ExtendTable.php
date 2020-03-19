@@ -1,7 +1,7 @@
 <?php
 require_once ('../ClassesBase/MysqlTable.php');
 
-class "CLASS"__ACTION extends ExtdEnum
+class "CLASS"_ACTION extends ExtdEnum
 {
 	const __default = self::ADD;
 	const ADD =		'add"class"';
@@ -58,11 +58,11 @@ final class "Class"Table extends MysqlTable implements "Class", UI_"Class"
 		return parent::_constructExit($read_write, "LOAD_GET_VARIABLE_NAME (=idload)");
 	}
 	
-	// Destructor (if parent)
+	// Destructor
 	function __destruct () {
-		$this->Parent = NULL;
+		parent::__destruct();
 	}
-	
+
 	// --------- Override or Initialize Table methods ---------
 	// GETTERS
 	// SETTERS
