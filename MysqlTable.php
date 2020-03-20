@@ -235,7 +235,7 @@ abstract class MysqlTable implements Table, UI_Table
 
 	// Destructor
 	function __destruct () {
-		if (!is_null($this->Parent) $this->Parent = NULL;
+		if (!is_null($this->Parent)) $this->Parent = NULL;
 		$this->bdd = NULL;
 	}
 	
@@ -384,7 +384,6 @@ abstract class MysqlTable implements Table, UI_Table
 		if (is_null($read_write)) $read_write = $this->default_access;
 		if (!ACCESS::hasKey($read_write)) return NULL;
 		if (!GET::hasKey($get) && !is_numeric($get)) $get = GET::__default;
-		if ($get == GET::__default) $get = $this->idLoad;
 		$ID = $this->getIdItem();
 
 		switch ($get) {
@@ -394,6 +393,9 @@ abstract class MysqlTable implements Table, UI_Table
 			case GET::LIST:
 				if (!$this->need_list($read_write)) return NULL;
 				else break;
+			case GET::SELF:
+				$get = $this->idLoad;
+				// continue
 			default:
 				if (!$this->rights_control($read_write, $get)) return NULL;
 				else break;
