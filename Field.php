@@ -203,11 +203,16 @@ class Field implements FieldInterface
 			case TYPE::DATE:
 				if (is_object($data)) return $data;
 				if (preg_match ('#^[0-9]+$#', $data) == 1)
-					return new DateTime (strtotime($data));
-				else return DateTime::createFromFormat ('Y-m-d', $data);
-				//return date('j/m/Y', strtotime($data));
+					return DateTime::createFromFormat ('Y-m-d', date('Y-m-d', $data));
+				else {
+					if (preg_match('#^([0-9]{2}-){2}[0-9]{2}$#', $data) == 1)
+						$data = '20'.$data;
+					if (preg_match('#^[0-9]{4}-[0-9]{2}-[0-9]{2}$#', $data) != 1)
+						return NULL;
+					return DateTime::createFromFormat ('Y-m-d', $data);
+				}
 			case TYPE::HOUR:
-				return date('H:m', strtotime($data));
+				return date('H:i', strtotime($data));
 			
 			case TYPE::COLOR:
 				return preg_replace('#\s#', '', DataManagement::secureText($data));

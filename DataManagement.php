@@ -1,10 +1,10 @@
 <?php
 date_default_timezone_set('Europe/Paris');
 
-	// STATIC basic functions for Data Management
+// STATIC basic functions for Data Management
 class DataManagement {
 	//prevent instanciation
-	function ___construct () { }
+	function __construct () { }
 	
 	// Static Methods
 	// Affichage
@@ -33,6 +33,18 @@ class DataManagement {
 			default:		return $date->format('j/m/Y');
 		}
 	}
+	public static function afficheHour($hour, $dest = 'print') {
+		$time = strtotime($hour);
+		switch ($dest) {
+			case 'form':
+			case 'schema':	return date('H:i', $time);//return $H.':'.$M;
+			default:
+				if (date('i', $time) > 0)
+					return date('G\hi', $time);
+				else return date('G\h', $time);
+		}
+	}
+	
 	public static function afficheMail($mail) {
 		return str_replace ('@', ' [AT] ', $mail);
 	}
@@ -83,6 +95,18 @@ class DataManagement {
 		
 		return $url;
 	}
+	
+	// get int value from hour
+	public static function timetoint($time) {
+		return (preg_replace ('#[a-zA-Z:]#', '', $time));
+	}
+	// Return true id date is a Sunday
+	public static function isSunday($date) {
+		if (!is_object($date)) return (date('w', strtotime($date)) == 0);
+		return ($date->format('w') == 0);
+	}
+
+
 		
 	// PRIVATE
 	/* bbCode :	· [H]...[/H]	: Titre
