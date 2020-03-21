@@ -161,11 +161,11 @@ abstract class MysqlTable implements Table, UI_Table
 	protected $Fields = array();	// List of fields
 	protected $bdd;					// bdd
 	protected $default_access;		// default ACCESS value
+	protected $Ordering;			// default ordering of data
+	protected $Limiting;			// default exclusion when getting data
 	// readable au niveau supérieur (getter)
 	protected $table;				// name of Mysql base table
 	protected $idLoad = NULL;		// page loaded Id
-	private	$Ordering;				// default ordering of data
-	private $Limiting;				// default exclusion when getting data
 	private $Prefs = array();		// preference cookies on this table
 	private $idItem = NULL; 		// nom de l'id dans la BDD
 	private $parentItem; 			// nom de l'id du parent dans la BDD
