@@ -289,8 +289,6 @@ class FileField extends Field implements FileInterface {
 			default: break;
 		}
 		
-		
-		echo 'final err = '.$err.'<br />';
 		return $err;
 	}
 	
