@@ -224,7 +224,10 @@ final class SessionManagement implements Session
 			}
 			
 			if ((isset ($_COOKIE[$cookie['name']]) && $_COOKIE[$cookie['name']] != $value) || $value != $cookie['default'])
-				setcookie ($cookie['name'], $value, time()+$cookie['expire']);
+				setcookie ($cookie['name'], $value, [
+						   'expires' => time()+$cookie['expire'],
+						   'samesite' => 'Lax'
+				]);
 		}
 	}
 
@@ -491,7 +494,10 @@ final class SessionManagement implements Session
 	    $ticket = self::generatePasswd(TICKET::COOKIE['size']).session_id().microtime();
 	    $ticket = hash('sha512', $ticket);
 	    $_SESSION[TICKET::SESSION['name']] = $ticket;
-	    setcookie(TICKET::COOKIE['name'], $ticket, time()+TICKET::COOKIE['expire']);
+	    setcookie(TICKET::COOKIE['name'], $ticket, [
+			'expires' => time()+TICKET::COOKIE['expire'],
+			'samesite' => 'Lax'
+		]);
 	}
 	
 	private function cleanTempDir () {
