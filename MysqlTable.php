@@ -1189,9 +1189,9 @@ abstract class MysqlTable implements Table, UI_Table
 		$scriptsuppr = 'confirmsuppr('.$data[$this->idItem].', "'.$this->table.'", "'.$texte.'");';
 		
 		?>
-		<form class="imgButton" method="post" action="<?php echo $_SERVER['SCRIPT_NAME']; ?>" id="suppr<?php echo $table.$data['id']; ?>">
+		<form class="imgButton" method="post" action="<?php echo $_SERVER['SCRIPT_NAME']; ?>" id="suppr<?php echo $this->table.$data[$this->idItem]; ?>">
 			<input type="hidden" name="action" value="<?php echo $action; ?>" />
-			<input type="hidden" name="id" value="<?php echo $data['id']; ?>" />
+			<input type="hidden" name="id" value="<?php echo $data[$this->idItem]; ?>" />
 		</form>
 		<img class="imgButton" title="Supprimer <?php echo $data[$mainField]; ?>" alt="-" src="../Styles/remove.png" onmousedown="this.src='../Styles/remove-clic.png';" onmouseup="this.src='../Styles/remove.png';" onmouseout="this.src='../Styles/remove.png';" onclick='<?php echo $scriptsuppr; ?>' />
 		<?php 	}
