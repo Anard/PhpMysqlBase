@@ -1049,12 +1049,14 @@ abstract class MysqlTable implements Table, UI_Table
 		$reponse = $this->bdd->prepare ('INSERT INTO '.$this->Table.' ('.$fullFields.') VALUES ('.$fullValues.')');
 
 		foreach ($validatedValues as $field => $value) {
+			echo "<h3>".$field." - ".$value." - ".$this->Fields[$field]->Type."</h3>";
 			switch ($this->Fields[$field]->Type) {
 				case TYPE::PARENT:
 				case TYPE::POSITION:
 				case TYPE::NUM:
 				case TYPE::BOOL:
-					$reponse->bindParam(strtolower($field), intval($value), PDO::PARAM_INT);
+					$value = intval($value);
+					$reponse->bindParam(strtolower($field), $value, PDO::PARAM_INT);
 					break;	
 				default:
 					//$reponse->bindParam(strtolower($field), $value, PDO::PARAM_STR);
