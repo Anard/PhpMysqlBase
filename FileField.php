@@ -81,12 +81,12 @@ class FileField extends Field implements FileInterface {
 	// Constants
 	// Chemin vers fichiers finaux
 	const PATH_UPLOAD = array (
-		'tmp'		=> '../Administration/tmp/',
-		'assos'		=> '../Animations/Files/',
-		'assos_pages' => '../Animations/Files/',
-		'event'		=> '../Agenda/Files/',
-		'thumbs'	=> '../Collection/Files/thumbs/',
-		'galerie'	=> '../Collection/Files/masters/'
+		'tmp'			=> '../Administration/tmp/',
+		'assos'			=> '../Animations/Files/',
+		'assos_pages'	=> '../Animations/Files/',
+		'agenda_dates'	=> '../Agenda/Files/',
+		'thumbs'		=> '../Collection/Files/thumbs/',
+		'galerie'		=> '../Collection/Files/masters/'
 	);
 	const PREFIX_UPLOAD = array (
 		 'assos'		=> 'asso',
