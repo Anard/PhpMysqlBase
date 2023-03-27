@@ -29,7 +29,7 @@ interface Table {
 	public function is_data ($id = 0);
 	// Return data array from DB, $read_write n'est utilisé que pour GET::LIST pour obtenir la list des entréees autorisées
 	public function get_data ($get = GET::__default, $fields = GET::ALL, $read_write = NULL);
-		
+	
 	// List
 	// Check if authorised on multiple entries
 	public function need_list ($read_write = NULL);
@@ -584,7 +584,7 @@ abstract class MysqlTable implements Table, UI_Table
 		
 		return $donnees;
 	}
-		
+	
 	// Admin list
 	// Check if authorised on multiple entries
 	public function need_list ($read_write = NULL) {
@@ -614,6 +614,7 @@ abstract class MysqlTable implements Table, UI_Table
 		
 		// prepare data
 		$postedValues = array_merge ($_POST, $_FILES);
+		
 		$validatedValues = $this->_validate_posted_data($this->secure_data($postedValues, true));
 
 		// post
@@ -738,18 +739,6 @@ abstract class MysqlTable implements Table, UI_Table
 		}
 	}*/
 	
-	// Secure full array for printing, set $record = true destination is DB
-	protected function secure_data ($data, $record = false) {
-		foreach ($data as $field => &$value) {
-			if (!array_key_exists($field, $this->Fields)) continue;
-			if ($value != "")
-				$value = $this->Fields[$field]->secure_data ($value, $record);
-		}
-		unset($value); // break the reference with the last element
-		
-		return $data;
-	}	
-	
 	// Validate posted data and push errors
 	protected function _validate_posted_data ($postedValues) {
 		foreach ($postedValues as $field => $value) {
@@ -757,7 +746,7 @@ abstract class MysqlTable implements Table, UI_Table
 			
 			// search errors
 			$err = (($value != "" || $this->Fields[$field]->Type == TYPE::FILE) ? $this->isValidValue($field, $value) : FIELD_ERR::OK);
-			if ($err && ($this->Fields[$field]->Type != TYPE::ID || $value > 0)) // ID is 0 to insert data
+			if ($err && ($this->Fields[$field]->Type != TYPE::ID || $value > 0)) // ID is 0 too insert data
 				array_push($this->Fields[$field]->Errors, $err);
 			
 			$nbErrors = sizeof($this->Fields[$field]->Errors);
@@ -1146,6 +1135,18 @@ abstract class MysqlTable implements Table, UI_Table
 		}
 		if (!isset($thisPos)) return 0;
 		return $thisPos;
+	}
+
+	// Secure full array for printing, set $record = true destination is DB
+	protected function secure_data ($data, $record = false) {
+		foreach ($data as $field => &$value) {
+			if (!array_key_exists($field, $this->Fields)) continue;
+			if ($value != "")
+				$value = $this->Fields[$field]->secure_data ($value, $record);
+		}
+		unset($value); // break the reference with the last element
+		
+		return $data;
 	}
 	
 	// try to page load an id
