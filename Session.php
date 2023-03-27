@@ -5,7 +5,7 @@ require_once ('Field.php');
 // INTERFACE for Session Management
 interface Session {
 	// CONSTANTS
-	// Bannisseement
+	// Bannissement
 	const COOKIESTOBAN = 2;
 	const PASSWDSTOBAN = 5;
 	// Redirections habitelles

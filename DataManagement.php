@@ -2,7 +2,27 @@
 date_default_timezone_set('Europe/Paris');
 
 // STATIC basic functions for Data Management
-class DataManagement {
+interface DataManagement_Interface {
+	// Affichage
+	public static function secureText($texte);
+	public static function decodeText($original);
+	/* Mise en forme avec retours à la ligne en supprimant simplement le bbCode */
+	public static function simplifyText($original);
+	public static function afficheDate($date, $dest = 'print');
+	public static function afficheHour($hour, $dest = 'print');
+	public static function afficheMail($mail);
+	public static function randomColor();
+	// Mise en forme des données pour enregistrement vers la BDD
+	public static function formatDate ($date);
+	// Mise en forme d'une url de la BDD
+	public static function formatURL($type, $nom, $id1, $id2);
+	// get int value from hour
+	public static function timetoint($time);
+	// Return true id date is a Sunday
+	public static function isSunday($date);
+}
+
+class DataManagement implements DataManagement_Interface {
 	//prevent instanciation
 	function __construct () { }
 	
