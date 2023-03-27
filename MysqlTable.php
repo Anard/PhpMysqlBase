@@ -23,8 +23,6 @@ interface Table {
 	// Return true if default access is write access
 	public function isAdminSection();
 	
-		// Secure full array for printing, set $record = true destination is DB
-	public function secure_data ($data, $record = false);
 	// Check if authorized
 	public function rights_control ($read_write = NULL, $id = 0, $userid = 0);
 	// Search if data exists from DB
@@ -299,18 +297,6 @@ abstract class MysqlTable implements Table, UI_Table
 	public function isAdminSection() {
 		return ($this->default_access == ACCESS::WRITE);	
 	}
-	
-	// Secure full array for printing, set $record = true destination is DB
-	public function secure_data ($data, $record = false) {
-		foreach ($data as $field => &$value) {
-			if (!array_key_exists($field, $this->Fields)) continue;
-			if ($value != "")
-				$value = $this->Fields[$field]->secure_data ($value, $record);
-		}
-		unset($value); // break the reference with the last element
-		
-		return $data;
-	}	
 	
 	// Check if authorized
 	private function _rights_control_basics ($read_write = NULL, $userid = 0) {
@@ -751,6 +737,18 @@ abstract class MysqlTable implements Table, UI_Table
 				else return $this->Fields[$field]->Required;
 		}
 	}*/
+	
+	// Secure full array for printing, set $record = true destination is DB
+	protected function secure_data ($data, $record = false) {
+		foreach ($data as $field => &$value) {
+			if (!array_key_exists($field, $this->Fields)) continue;
+			if ($value != "")
+				$value = $this->Fields[$field]->secure_data ($value, $record);
+		}
+		unset($value); // break the reference with the last element
+		
+		return $data;
+	}	
 	
 	// Validate posted data and push errors
 	protected function _validate_posted_data ($postedValues) {
